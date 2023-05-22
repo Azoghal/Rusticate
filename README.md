@@ -1,0 +1,2 @@
+# Rusticate
+Some Rust projects
