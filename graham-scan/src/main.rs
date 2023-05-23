@@ -205,6 +205,10 @@ fn graham_scan(points:Vec<Point>){
     // take all the points
     // return an ordered vector of convex hull points,
     // counterclockwise from lowest point.
+
+    // TODO: tidy this whole thing up with mega tuples in one vec?
+    // Might not be any tidier.
+
     let i_points: Vec<(usize,&Point)> = points.iter().enumerate().collect();
 
     let min_y_index : Option<&usize> = i_points
@@ -219,7 +223,7 @@ fn graham_scan(points:Vec<Point>){
     
     let (_base_id, base_point) = i_points[*idx];
     
-    let mut angles: Vec<(&usize,f32)>= i_points.iter().map(|(i,p)| (i,points_cos(p,&base_point))).collect();
+    let mut angles: Vec<(usize,f32)>= i_points.iter().map(|(i,p)| (*i ,points_cos(p,&base_point))).collect();
     // for(i,ang) in &angles{
     //     println!("{} cos: {}",i, ang);
     // }
@@ -231,6 +235,23 @@ fn graham_scan(points:Vec<Point>){
     //     println!("{} cos: {}",i, ang);
     // }
 
+    let order: Vec<usize> = angles.iter().map(|(i,_)| *i).collect();
+    let ordered_points: Vec<&Point> = order.iter().map(|i| &points[*i]).collect();
+    for i in 0..ordered_points.len()-3{
+        let section = &ordered_points[i..i+3];
+        println!("{} {} {}",section[0], section[1], section[2]);
+        println!("{}", is_left_turn(section));
+    }
     // now we have the order to consider points in, so we begin the scan.
+}
 
+fn is_left_turn(section: &[&Point]) -> bool{
+    // determine if path p1->p2->p3 constitutes a left or right turn
+    // compute the z coordinate of the cross product of the two vectors p1p2 p1p3
+    // (x2-x1)(y3-y1) - (y2-y1)(x3-x1)
+    let p1: &Point = section[0];
+    let p2: &Point = section[1];
+    let p3: &Point = section[2];
+    let cross_z:i32 = (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x);
+    return cross_z<0;
 }
