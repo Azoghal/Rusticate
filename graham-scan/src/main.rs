@@ -6,6 +6,8 @@ use rand_distr::{Normal};
 use std::fs::File;
 use std::io::prelude::*;
 use std::str::FromStr;
+use std::cmp::Ordering;
+
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -69,10 +71,28 @@ fn main() {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq)]
 struct Point{
     x:i32,
     y:i32,
+}
+
+impl Ord for Point{
+    fn cmp(&self, other: &Self) -> Ordering{
+        self.y.cmp(&other.y).then(self.x.cmp(&other.x))
+    }
+}
+
+impl PartialOrd for Point {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Point {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y
+    }
 }
 
 impl fmt::Display for Point{
@@ -209,19 +229,21 @@ fn graham_scan(points:Vec<Point>){
     // TODO: tidy this whole thing up with mega tuples in one vec?
     // Might not be any tidier.
 
+    let mut convex_hull: Vec<Point>; // where we're going to store our convex hull
+
     let i_points: Vec<(usize,&Point)> = points.iter().enumerate().collect();
 
     let min_y_index : Option<&usize> = i_points
         .iter()
-        .map(|(i,p)| (i,p.y))
         .min_by(|(_, a), (_, b)| a.cmp(b))
         .map(|(index, _)| index);
+    
 
     let Some(idx) = min_y_index else{
         panic!("Error finding min y");
     };
-    
-    let (_base_id, base_point) = i_points[*idx];
+    let (base_id, base_point) = i_points[*idx];
+    println!("base point {} {}", base_id, base_point);
     
     let mut angles: Vec<(usize,f32)>= i_points.iter().map(|(i,p)| (*i ,points_cos(p,&base_point))).collect();
     // for(i,ang) in &angles{
@@ -231,20 +253,20 @@ fn graham_scan(points:Vec<Point>){
     // println!("Now sorting");
     angles.sort_by(|(_i,a),(_j,b)| a.partial_cmp(&b).unwrap());
     angles.reverse();
-    // for(i,ang) in &angles{
-    //     println!("{} cos: {}",i, ang);
-    // }
+    for(i,ang) in &angles{
+        println!("{} at {} cos: {}",i, i_points[*i].1, ang);
+    }
 
     let order: Vec<usize> = angles.iter().map(|(i,_)| *i).collect();
     let ordered_points: Vec<&Point> = order.iter().map(|i| &points[*i]).collect();
+    println!("base point {} {}", order[0], ordered_points[0]);
     for i in 0..ordered_points.len()-2{
         let section = &ordered_points[i..i+3];
-        println!("{} {} {} {}", i, section[0], section[1], section[2]);
-        println!("{}", is_left_turn(section));
+        // println!("{} {} {} {}", i, section[0], section[1], section[2]);
+        // println!("{}", is_left_turn(section));
+
     }
     // now we have the order to consider points in, so we begin the scan.
-
-
 }
 
 fn is_left_turn(section: &[&Point]) -> bool{
