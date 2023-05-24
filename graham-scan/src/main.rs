@@ -237,12 +237,14 @@ fn graham_scan(points:Vec<Point>){
 
     let order: Vec<usize> = angles.iter().map(|(i,_)| *i).collect();
     let ordered_points: Vec<&Point> = order.iter().map(|i| &points[*i]).collect();
-    for i in 0..ordered_points.len()-3{
+    for i in 0..ordered_points.len()-2{
         let section = &ordered_points[i..i+3];
-        println!("{} {} {}",section[0], section[1], section[2]);
+        println!("{} {} {} {}", i, section[0], section[1], section[2]);
         println!("{}", is_left_turn(section));
     }
     // now we have the order to consider points in, so we begin the scan.
+
+
 }
 
 fn is_left_turn(section: &[&Point]) -> bool{
