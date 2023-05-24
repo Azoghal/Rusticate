@@ -71,7 +71,8 @@ fn main() {
     }
 }
 
-#[derive(Debug, Eq)]
+// copy and clone are reasonable as in rusttype::Point
+#[derive(Copy, Clone, Debug, Eq)] 
 struct Point{
     x:i32,
     y:i32,
@@ -229,8 +230,6 @@ fn graham_scan(points:Vec<Point>){
     // TODO: tidy this whole thing up with mega tuples in one vec?
     // Might not be any tidier.
 
-    let mut convex_hull: Vec<Point>; // where we're going to store our convex hull
-
     let i_points: Vec<(usize,&Point)> = points.iter().enumerate().collect();
 
     let min_y_index : Option<&usize> = i_points
@@ -260,13 +259,22 @@ fn graham_scan(points:Vec<Point>){
     let order: Vec<usize> = angles.iter().map(|(i,_)| *i).collect();
     let ordered_points: Vec<&Point> = order.iter().map(|i| &points[*i]).collect();
     println!("base point {} {}", order[0], ordered_points[0]);
+    
+    let mut convex_hull: Vec<Point> = vec![]; // where we're going to store our convex hull
+    
+    // we add the lowest point, and the first one we hit as we raise angle from the x axis
+    // as these are guarunteed to be in the hull.
+    convex_hull.push(*ordered_points[0]);
+    convex_hull.push(*ordered_points[1]);
+
+    //do the scan.
     for i in 0..ordered_points.len()-2{
         let section = &ordered_points[i..i+3];
         // println!("{} {} {} {}", i, section[0], section[1], section[2]);
         // println!("{}", is_left_turn(section));
 
     }
-    // now we have the order to consider points in, so we begin the scan.
+
 }
 
 fn is_left_turn(section: &[&Point]) -> bool{
