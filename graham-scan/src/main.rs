@@ -252,38 +252,53 @@ fn graham_scan(points:Vec<Point>){
     // println!("Now sorting");
     angles.sort_by(|(_i,a),(_j,b)| a.partial_cmp(&b).unwrap());
     angles.reverse();
-    for(i,ang) in &angles{
-        println!("{} at {} cos: {}",i, i_points[*i].1, ang);
-    }
+    // for(i,ang) in &angles{
+    //     println!("{} at {} cos: {}",i, i_points[*i].1, ang);
+    // }
 
     let order: Vec<usize> = angles.iter().map(|(i,_)| *i).collect();
     let ordered_points: Vec<&Point> = order.iter().map(|i| &points[*i]).collect();
-    println!("base point {} {}", order[0], ordered_points[0]);
-    
-    let mut convex_hull: Vec<Point> = vec![]; // where we're going to store our convex hull
-    
+
+    let mut convex_hull: Vec<&Point> = vec![]; // where we're going to store our convex hull
     // we add the lowest point, and the first one we hit as we raise angle from the x axis
     // as these are guarunteed to be in the hull.
-    convex_hull.push(*ordered_points[0]);
-    convex_hull.push(*ordered_points[1]);
+    convex_hull.push(ordered_points[0]);
+    convex_hull.push(ordered_points[1]);
+    // the last element of the convex hull should be the last element of the ordered points
+    // by the same argument as that ordered_points[1] will be in the convex hull.
+    
+    println!("Starting the scan");
 
     //do the scan.
-    for i in 0..ordered_points.len()-2{
-        let section = &ordered_points[i..i+3];
-        // println!("{} {} {} {}", i, section[0], section[1], section[2]);
-        // println!("{}", is_left_turn(section));
-
+    let mut ch_len;
+    for i in 2..ordered_points.len(){
+        ch_len = convex_hull.len();
+        convex_hull.push(ordered_points[i]);
+        while ch_len >= 3 && is_right_turn(&convex_hull[ch_len-3..ch_len]){
+            let Some(top) = convex_hull.pop() else{
+                panic!("Empty convex hull");
+            };
+            let Some(_discard) = convex_hull.pop() else{
+                panic!("Empty convex hull");
+            };
+            convex_hull.push(top);
+            ch_len = convex_hull.len();
+        }
     }
 
+    for p in convex_hull.iter(){
+        println!("{}",p);
+    }
+    println!("Final Length of convex hull over {} points {}", points.len(), convex_hull.len());
 }
 
-fn is_left_turn(section: &[&Point]) -> bool{
+fn is_right_turn(section: &[&Point]) -> bool{
     // determine if path p1->p2->p3 constitutes a left or right turn
     // compute the z coordinate of the cross product of the two vectors p1p2 p1p3
     // (x2-x1)(y3-y1) - (y2-y1)(x3-x1)
     let p1: &Point = section[0];
     let p2: &Point = section[1];
     let p3: &Point = section[2];
-    let cross_z:i32 = (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x);
+    let cross_z:i32 = (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x);   
     return cross_z<0;
 }
