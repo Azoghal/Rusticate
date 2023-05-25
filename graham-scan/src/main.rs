@@ -73,7 +73,7 @@ fn main() {
 
 // copy and clone are reasonable as in rusttype::Point
 #[derive(Copy, Clone, Debug, Eq)] 
-struct Point{
+pub struct Point{
     x:i32,
     y:i32,
 }
@@ -103,7 +103,7 @@ impl fmt::Display for Point{
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct ParsePointError;
+pub struct ParsePointError;
 
 impl FromStr for Point{
     type Err = ParsePointError;
@@ -222,7 +222,7 @@ fn points_cos(p1:&Point, p2:&Point)->f32{
     return cos;
 }
 
-fn graham_scan(points:Vec<Point>){
+pub fn graham_scan(points:Vec<Point>) -> Vec<Point>{
     // take all the points
     // return an ordered vector of convex hull points,
     // counterclockwise from lowest point.
@@ -257,9 +257,9 @@ fn graham_scan(points:Vec<Point>){
     // }
 
     let order: Vec<usize> = angles.iter().map(|(i,_)| *i).collect();
-    let ordered_points: Vec<&Point> = order.iter().map(|i| &points[*i]).collect();
+    let ordered_points: Vec<Point> = order.iter().map(|i| points[*i]).collect();
 
-    let mut convex_hull: Vec<&Point> = vec![]; // where we're going to store our convex hull
+    let mut convex_hull: Vec<Point> = vec![]; // where we're going to store our convex hull
     // we add the lowest point, and the first one we hit as we raise angle from the x axis
     // as these are guarunteed to be in the hull.
     convex_hull.push(ordered_points[0]);
@@ -290,15 +290,38 @@ fn graham_scan(points:Vec<Point>){
         println!("{}",p);
     }
     println!("Final Length of convex hull over {} points {}", points.len(), convex_hull.len());
+
+    return convex_hull;
 }
 
-fn is_right_turn(section: &[&Point]) -> bool{
+fn is_right_turn(section: &[Point]) -> bool{
     // determine if path p1->p2->p3 constitutes a left or right turn
     // compute the z coordinate of the cross product of the two vectors p1p2 p1p3
     // (x2-x1)(y3-y1) - (y2-y1)(x3-x1)
-    let p1: &Point = section[0];
-    let p2: &Point = section[1];
-    let p3: &Point = section[2];
+    let p1: Point = section[0];
+    let p2: Point = section[1];
+    let p3: Point = section[2];
     let cross_z:i32 = (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x);   
     return cross_z<0;
+}
+
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    fn make_points(positions: Vec<(i32,i32)>) -> Vec<Point>{
+        let mut points: Vec<Point> = vec![];
+        for (x,y) in positions{
+            points.push(Point{x,y});
+        }
+        return points;
+    }
+
+    #[test]
+    fn basic_square(){
+        // before I do this, going to fiddle with main in order to make it easier to mock
+        let test_points: Vec<Point> = make_points(vec![(10,10),(50,10),(50,50),(10,50)]);
+        let res: Vec<Point> = graham_scan(test_points);
+    }
 }
