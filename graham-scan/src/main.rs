@@ -210,6 +210,12 @@ fn points_mag(p:&Point)->f32{
     return mag;
 }
 
+// TODO remove by adding operators for point
+fn points_dif_mag(p1:&Point, p2:&Point)->f32{
+    let p = Point{x:p1.x-p2.x, y:p1.y-p2.y};
+    return points_mag(&p);
+}
+
 fn points_dot(p1:&Point, p2:&Point)->i32{
     return p1.x*p2.x + p1.y*p2.y;
 }
@@ -232,11 +238,38 @@ fn _points_slope(p1: &Point, p2:&Point) -> f32{
     return dif_y/dif_x;
 }
 
+fn dedup_by_angle_metric(base_point:Point, sorted_points: Vec<(Point, f32)>) -> Vec<Point>{
+    // keep the furthest colinear points
+    // discard the angle metric
+    let mut deduped:Vec<Point>  = vec![];
+    deduped.push(sorted_points[0].0);
+    let mut last_angle: f32 = sorted_points[0].1;
+    let mut last_mag: f32 = points_dif_mag(&base_point, &sorted_points[0].0);
+    for (p, a) in &sorted_points[1..]{
+        let new_mag = points_dif_mag(p, &base_point);
+        if *a == last_angle{
+            // same angle, only keep the furthest point
+            if new_mag > last_mag{
+                deduped.pop(); // discard closer point that is colinear with base point
+                deduped.push(*p); // 
+            }
+        }else{
+            // different angle, keep for now
+            deduped.push(*p);
+        }
+        last_mag = new_mag;
+        last_angle = *a;
+    }
+    let deduped_points: Vec<Point> = vec![];
+    return deduped;
+}
+
 pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
     // we have a vector of points as argument
     // we have a stack of convex hull points
     // 1. we find the base point and remove it, adding to convex hull
     // 2. we make a new vector (point,angle) and sort
+    // 2. a. remove the nearer colinear point
     // 3. we find the first point and remove it, adding to convex hull
     // 4. we loop over this vector to push to convex hull and make checks.
 
@@ -263,19 +296,28 @@ pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
     let mut sorted_cand_points = cand_points.clone();
     sorted_cand_points.sort_by(|(_p1,angle1),(_p2,angle2)| angle1.partial_cmp(&angle2).unwrap());
 
-    let mut candidates = sorted_cand_points.iter().map(|(p,_a)| p);
+    // 2.a remove all but one if angle is the same- keep furthest point.
+    // Can't concieve how to do this with iterator functions
+    let candidates:Vec<Point> = dedup_by_angle_metric(*base_point, sorted_cand_points);
+
+    for c in candidates.iter(){
+        println!("{}", c);
+    }
+
+    let mut cand_iter = candidates.iter();
+    //let mut candidates = sorted_cand_points.iter().map(|(p,_a)| p);
 
     // 3. we can push the first one to the convex hull because we know it will be in the convex hull
-    let Some(first_cand) = candidates.next() else{
+    let Some(first_cand) = cand_iter.next() else{
         panic!("Empty candidate iter");
     };
     convex_hull.push(*first_cand);
     // 4. do the scan
     let mut ch_len;
-    for cand in candidates{
+    for cand in cand_iter{
         convex_hull.push(*cand);
         ch_len = convex_hull.len();
-        while ch_len >= 3 && is_right_turn(&convex_hull[ch_len-3..ch_len]){
+        while ch_len >= 3 && is_right_or_no_turn(&convex_hull[ch_len-3..ch_len]){
             let Some(top) = convex_hull.pop() else{
                 panic!("Empty convex hull");
             };
@@ -295,15 +337,26 @@ pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
     return convex_hull;
 }
 
-fn is_right_turn(section: &[Point]) -> bool{
-    // determine if path p1->p2->p3 constitutes a left or right turn
+fn is_right_or_no_turn(section: &[Point]) -> bool{
+    // determine if path p1->p2->p3 constitutes a right turn
     // compute the z coordinate of the cross product of the two vectors p1p2 p1p3
     // (x2-x1)(y3-y1) - (y2-y1)(x3-x1)
     let p1: Point = section[0];
     let p2: Point = section[1];
     let p3: Point = section[2];
     let cross_z:i32 = (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x); 
-    return cross_z<0;
+    let message;
+    if cross_z<0{
+        message = "right turn";
+    }
+    else if cross_z >0 {
+        message = "left turn";
+    }
+    else{
+        message = "colinear";
+    }
+    println!("{}->{}->{} is {}", p1,p2,p3,message);
+    return cross_z<=0;
 }
 
 
@@ -332,6 +385,7 @@ mod tests{
         let points = vec![(10,10), (20,10)];
         graham_scan(make_points(points));
     }
+
     #[test]
     fn basic_square(){
         let square_points = vec![(10,10),(50,10),(50,50),(10,50)];
@@ -340,4 +394,32 @@ mod tests{
         let res: Vec<Point> = graham_scan(test_points);
         assert_eq!(expected_points, res);
     }
+
+    #[test]
+    fn colinear_square(){
+        // Convex hull should be minimum convex set that contains
+        let square_points = vec![(10,10),(50,10),(50,50),(10,50)];
+        let points = vec![(10,10),(50,10),(50,50),(10,50), (30,10),(50,30),(30,50),(10,30)];
+        let test_points: Vec<Point> = make_points(points);
+        let expected_points: Vec<Point> = make_points(square_points);
+        let res: Vec<Point> = graham_scan(test_points);
+        assert_eq!(expected_points, res);
+    }
+
+    #[test]
+    fn dedupe_simple(){
+        let duplicate_angles: Vec<(Point,f32)> = vec![(Point{x:10,y:10}, 0.5), (Point{x:20,y:20}, 0.5)];
+        let res = dedup_by_angle_metric(Point{x:0,y:0}, duplicate_angles);
+        assert_eq!(res, vec![Point{x:20,y:20}]);
+    }
+
+    #[test]
+    fn dedupe_more(){
+        let duplicate_angles: Vec<(Point,f32)> = vec![
+            (Point{x:10,y:10}, 0.5), (Point{x:20,y:20}, 0.5), (Point{x:16,y:20}, 0.4),(Point{x:15,y:20}, 0.3), (Point{x:30,y:40}, 0.3)
+        ];
+        let res = dedup_by_angle_metric(Point{x:0,y:0}, duplicate_angles);
+        assert_eq!(res, vec![Point{x:20,y:20},Point{x:16,y:20},Point{x:30,y:40}]);
+    }
+
 }
