@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::str::FromStr;
 use std::cmp::Ordering;
+use core::ops;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -77,6 +78,16 @@ pub struct Point{
     y:i32,
 }
 
+impl Point{
+    fn mag(&self)->f32{
+        return ((self.x*self.x + self.y*self.y)as f32).sqrt();
+    }
+
+    fn dot(&self, rhs:Point) -> i32{
+        self.x*rhs.x + self.y*rhs.y
+    }
+}
+
 impl Ord for Point{
     fn cmp(&self, other: &Self) -> Ordering{
         self.y.cmp(&other.y).then(self.x.cmp(&other.x))
@@ -92,6 +103,20 @@ impl PartialOrd for Point {
 impl PartialEq for Point {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y
+    }
+}
+
+impl ops::Sub<Point> for Point{
+    type Output = Point;
+    fn sub(self, rhs: Point) -> Point{
+        Point{x:self.x-rhs.x, y:self.y-rhs.y}
+    }
+}
+
+impl ops::Add<Point> for Point{
+    type Output = Point;
+    fn add(self, rhs: Point) -> Point{
+        Point{x:self.x+rhs.x, y:self.y+rhs.y}
     }
 }
 
@@ -204,39 +229,38 @@ fn load_point_vec(filename:&String) -> std::io::Result<Vec<Point>>{
 }
 
 // todo: make part of Points struct/class
-fn points_mag(p:&Point)->f32{
-    let mag_sq = (p.x*p.x + p.y*p.y) as f32;
-    let mag:f32 = mag_sq.sqrt();
-    return mag;
-}
+// fn points_mag(p:&Point)->f32{
+//     let mag_sq = (p.x*p.x + p.y*p.y) as f32;
+//     let mag:f32 = mag_sq.sqrt();
+//     return mag;
+// }
 
-// TODO remove by adding operators for point
-fn points_dif_mag(p1:&Point, p2:&Point)->f32{
-    let p = Point{x:p1.x-p2.x, y:p1.y-p2.y};
-    return points_mag(&p);
-}
+// // TODO remove by adding operators for point
+// fn points_dif_mag(p1:&Point, p2:&Point)->f32{
+//     let p = Point{x:p1.x-p2.x, y:p1.y-p2.y};
+//     return points_mag(&p);
+// }
 
-fn points_dot(p1:&Point, p2:&Point)->i32{
-    return p1.x*p2.x + p1.y*p2.y;
-}
+// fn points_dot(p1:&Point, p2:&Point)->i32{
+//     return p1.x*p2.x + p1.y*p2.y;
+// }
 
 fn points_cos(base:&Point, p1:&Point)->f32{
     // TODO: Point operators
-    let dif: Point = Point{x:p1.x-base.x, y:p1.y-base.y};
+    let dif: Point = *p1-*base;
     let x_axis = Point{x:1,y:0};
-    let mag_prod = points_mag(&dif);// * points_mag(&p2);
-    let dot = points_dot(&dif, &x_axis) as f32;
+    let mag_prod = dif.mag();
+    let dot = dif.dot(x_axis) as f32;
     let cos = dot/mag_prod;
     return cos;
 }
 
 // alternative angle sorting metric
-fn _points_slope(p1: &Point, p2:&Point) -> f32{
-    //TODO refactor with proper operators
-    let dif_x : f32 = (p2.x-p1.x) as f32;
-    let dif_y : f32 = (p2.y-p1.y) as f32;
-    return dif_y/dif_x;
-}
+// fn _points_slope(p1: &Point, p2:&Point) -> f32{
+//     //TODO refactor with proper operators
+//     let dif = *p2-*p1;
+//     return (dif.y as f32)/(dif.x as f32);
+// }
 
 fn dedup_by_angle_metric(base_point:Point, sorted_points: Vec<(Point, f32)>) -> Vec<Point>{
     // keep the furthest colinear points
@@ -244,9 +268,9 @@ fn dedup_by_angle_metric(base_point:Point, sorted_points: Vec<(Point, f32)>) -> 
     let mut deduped:Vec<Point>  = vec![];
     deduped.push(sorted_points[0].0);
     let mut last_angle: f32 = sorted_points[0].1;
-    let mut last_mag: f32 = points_dif_mag(&base_point, &sorted_points[0].0);
+    let mut last_mag: f32 = (base_point-sorted_points[0].0).mag();
     for (p, a) in &sorted_points[1..]{
-        let new_mag = points_dif_mag(p, &base_point);
+        let new_mag = (*p-base_point).mag();
         if *a == last_angle{
             // same angle, only keep the furthest point
             if new_mag > last_mag{
@@ -260,7 +284,6 @@ fn dedup_by_angle_metric(base_point:Point, sorted_points: Vec<(Point, f32)>) -> 
         last_mag = new_mag;
         last_angle = *a;
     }
-    let deduped_points: Vec<Point> = vec![];
     return deduped;
 }
 
