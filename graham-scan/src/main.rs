@@ -24,11 +24,13 @@ enum Commands {
 
 #[derive(Args)]
 struct RunArgs{
+    #[arg(default_value="points.txt")]
     filename:String,
 }
 
 #[derive(Args)]
 struct SampleArgs{
+    #[arg(default_value="points.txt")]
     filename:String,
     #[arg(value_enum, default_value_t=Sampler::Random)]
     sampler:Sampler,
@@ -208,17 +210,9 @@ pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
     sorted_cand_points.sort_by(|(_p1,angle1),(_p2,angle2)| angle1.partial_cmp(&angle2).unwrap());
     sorted_cand_points.reverse();
 
-    for (p,a) in sorted_cand_points.iter(){
-        println!("{} {}", p, a);
-    }
-
     // 2.a remove all but one if angle is the same- keep furthest point.
     // Can't concieve how to do this with iterator functions
     let candidates:Vec<Point> = dedup_by_angle_metric(*base_point, sorted_cand_points);
-
-    for c in candidates.iter(){
-        println!("{}", c);
-    }
 
     let mut cand_iter = candidates.iter();
     //let mut candidates = sorted_cand_points.iter().map(|(p,_a)| p);
@@ -261,17 +255,17 @@ fn is_right_or_no_turn(section: &[Point]) -> bool{
     let p2: Point = section[1];
     let p3: Point = section[2];
     let cross_z:i32 = Point::cross_z(p1,p2,p3); 
-    let message;
-    if cross_z<0{
-        message = "right turn";
-    }
-    else if cross_z >0 {
-        message = "left turn";
-    }
-    else{
-        message = "colinear";
-    }
-    println!("{}->{}->{} is {}", p1,p2,p3,message);
+    //let message;
+    // if cross_z<0{
+    //     message = "right turn";
+    // }
+    // else if cross_z >0 {
+    //     message = "left turn";
+    // }
+    // else{
+    //     message = "colinear";
+    // }
+    // println!("{}->{}->{} is {}", p1,p2,p3,message);
     return cross_z<=0;
 }
 
