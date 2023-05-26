@@ -50,13 +50,11 @@ impl fmt::Display for Sampler{
     }
 }
 
-
 const DIMS:(i32,i32) = (256,256);
 
 fn main() {
-    // TODO: parse arguments that determine action
     // 1. Run graham scan on input file's point positions
-    // 2. Generate point positions
+    // 2. Sample point positions
     //   a. Specify point positions sample function
     let cli = CLI::parse();
 
@@ -228,23 +226,6 @@ fn load_point_vec(filename:&String) -> std::io::Result<Vec<Point>>{
     Ok(points)
 }
 
-// todo: make part of Points struct/class
-// fn points_mag(p:&Point)->f32{
-//     let mag_sq = (p.x*p.x + p.y*p.y) as f32;
-//     let mag:f32 = mag_sq.sqrt();
-//     return mag;
-// }
-
-// // TODO remove by adding operators for point
-// fn points_dif_mag(p1:&Point, p2:&Point)->f32{
-//     let p = Point{x:p1.x-p2.x, y:p1.y-p2.y};
-//     return points_mag(&p);
-// }
-
-// fn points_dot(p1:&Point, p2:&Point)->i32{
-//     return p1.x*p2.x + p1.y*p2.y;
-// }
-
 fn points_cos(base:&Point, p1:&Point)->f32{
     // TODO: Point operators
     let dif: Point = *p1-*base;
@@ -254,13 +235,6 @@ fn points_cos(base:&Point, p1:&Point)->f32{
     let cos = dot/mag_prod;
     return cos;
 }
-
-// alternative angle sorting metric
-// fn _points_slope(p1: &Point, p2:&Point) -> f32{
-//     //TODO refactor with proper operators
-//     let dif = *p2-*p1;
-//     return (dif.y as f32)/(dif.x as f32);
-// }
 
 fn dedup_by_angle_metric(base_point:Point, sorted_points: Vec<(Point, f32)>) -> Vec<Point>{
     // keep the furthest colinear points
