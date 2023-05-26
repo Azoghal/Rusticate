@@ -1,13 +1,12 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::fmt;
-//use rand::Rng;
 use rand::distributions::{Distribution, Uniform};
 use rand_distr::{Normal};
 use std::fs::File;
 use std::io::prelude::*;
-use std::str::FromStr;
-use std::cmp::Ordering;
-use core::ops;
+
+mod points;
+use points::Point;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -69,79 +68,6 @@ fn main() {
     }
 }
 
-// copy and clone are reasonable as in rusttype::Point
-#[derive(Copy, Clone, Debug, Eq)] 
-pub struct Point{
-    x:i32,
-    y:i32,
-}
-
-impl Point{
-    fn mag(&self)->f32{
-        return ((self.x*self.x + self.y*self.y)as f32).sqrt();
-    }
-
-    fn dot(&self, rhs:Point) -> i32{
-        self.x*rhs.x + self.y*rhs.y
-    }
-}
-
-impl Ord for Point{
-    fn cmp(&self, other: &Self) -> Ordering{
-        self.y.cmp(&other.y).then(self.x.cmp(&other.x))
-    }
-}
-
-impl PartialOrd for Point {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for Point {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y
-    }
-}
-
-impl ops::Sub<Point> for Point{
-    type Output = Point;
-    fn sub(self, rhs: Point) -> Point{
-        Point{x:self.x-rhs.x, y:self.y-rhs.y}
-    }
-}
-
-impl ops::Add<Point> for Point{
-    type Output = Point;
-    fn add(self, rhs: Point) -> Point{
-        Point{x:self.x+rhs.x, y:self.y+rhs.y}
-    }
-}
-
-impl fmt::Display for Point{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result{
-        write!(f,"({},{})", self.x, self.y)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct ParsePointError;
-
-impl FromStr for Point{
-    type Err = ParsePointError;
-    fn from_str(s: &str) -> Result<Self,Self::Err>{
-        let (x, y) = s
-            .strip_prefix('(')
-            .and_then(|s| s.strip_suffix(')'))
-            .and_then(|s| s.split_once(','))
-            .ok_or(ParsePointError)?;
-        let x_fromstr = x.parse::<i32>().map_err(|_| ParsePointError)?;
-        let y_fromstr = y.parse::<i32>().map_err(|_| ParsePointError)?;
-        Ok(Point{x:x_fromstr, y:y_fromstr})
-    }
-}
-
-
 fn run(filename:&String){
     // runs graham scan upon points found in file
     println!("run - input from {}",filename);
@@ -181,7 +107,7 @@ fn generate_normal_samples(n_points:u8)-> Vec<Point>{
         // Todo replace with normal samples
         let rx:i32 = normal_x.sample(&mut rng) as i32;
         let ry:i32 = normal_y.sample(&mut rng) as i32;
-        samples.push(Point{x:rx,y:ry});
+        samples.push(Point::new(rx,ry));
     }
     samples
 }
@@ -197,7 +123,7 @@ fn generate_random_samples(n_points:u8)-> Vec<Point>{
         // Todo replace with random samples
         let rx:i32 = uniform_x.sample(&mut rng) as i32;
         let ry:i32 = uniform_y.sample(&mut rng) as i32;
-        samples.push(Point{x:rx,y:ry});
+        samples.push(Point::new(rx,ry));
     }
     samples
 }
@@ -229,7 +155,7 @@ fn load_point_vec(filename:&String) -> std::io::Result<Vec<Point>>{
 fn points_cos(base:&Point, p1:&Point)->f32{
     // TODO: Point operators
     let dif: Point = *p1-*base;
-    let x_axis = Point{x:1,y:0};
+    let x_axis = Point::new(1,0);
     let mag_prod = dif.mag();
     let dot = dif.dot(x_axis) as f32;
     let cos = dot/mag_prod;
@@ -341,7 +267,7 @@ fn is_right_or_no_turn(section: &[Point]) -> bool{
     let p1: Point = section[0];
     let p2: Point = section[1];
     let p3: Point = section[2];
-    let cross_z:i32 = (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x); 
+    let cross_z:i32 = Point::cross_z(p1,p2,p3); 
     let message;
     if cross_z<0{
         message = "right turn";
@@ -364,7 +290,7 @@ mod tests{
     fn make_points(positions: Vec<(i32,i32)>) -> Vec<Point>{
         let mut points: Vec<Point> = vec![];
         for (x,y) in positions{
-            points.push(Point{x,y});
+            points.push(Point::new(x,y));
         }
         return points;
     }
@@ -405,18 +331,18 @@ mod tests{
 
     #[test]
     fn dedupe_simple(){
-        let duplicate_angles: Vec<(Point,f32)> = vec![(Point{x:10,y:10}, 0.5), (Point{x:20,y:20}, 0.5)];
-        let res = dedup_by_angle_metric(Point{x:0,y:0}, duplicate_angles);
-        assert_eq!(res, vec![Point{x:20,y:20}]);
+        let duplicate_angles: Vec<(Point,f32)> = vec![(Point::new(10,10), 0.5), (Point::new(20,20), 0.5)];
+        let res: Vec<Point> = dedup_by_angle_metric(Point::new(0,0), duplicate_angles);
+        assert_eq!(res, vec![Point::new(20,20)]);
     }
 
     #[test]
     fn dedupe_more(){
         let duplicate_angles: Vec<(Point,f32)> = vec![
-            (Point{x:10,y:10}, 0.5), (Point{x:20,y:20}, 0.5), (Point{x:16,y:20}, 0.4),(Point{x:15,y:20}, 0.3), (Point{x:30,y:40}, 0.3)
+            (Point::new(10,10), 0.5), (Point::new(20,20), 0.5), (Point::new(16,20), 0.4), (Point::new(15,20), 0.3), (Point::new(30,40), 0.3)
         ];
-        let res = dedup_by_angle_metric(Point{x:0,y:0}, duplicate_angles);
-        assert_eq!(res, vec![Point{x:20,y:20},Point{x:16,y:20},Point{x:30,y:40}]);
+        let res: Vec<Point> = dedup_by_angle_metric(Point::new(0,0), duplicate_angles);
+        assert_eq!(res, vec![Point::new(20,20),Point::new(16,20),Point::new(30,40)]);
     }
 
 }
