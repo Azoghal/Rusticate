@@ -68,7 +68,7 @@ fn main() {
     }
 }
 
-fn run(filename:&String){
+fn run(filename:&str){
     // runs graham scan upon points found in file
     println!("run - input from {}",filename);
     let Ok(samples) = load_point_vec(filename) else{
@@ -78,7 +78,7 @@ fn run(filename:&String){
 }
 
 
-fn sample(filename:&String, sampler: &Sampler){
+fn sample(filename:&str, sampler: &Sampler){
     // samples points from specified sampler and saves to file
     println!("sample - output to {}, sampler used {}", filename, sampler);
     let samples:Vec<Point> = match &sampler{
@@ -104,7 +104,6 @@ fn generate_normal_samples(n_points:u8)-> Vec<Point>{
     let normal_y = Normal::new((DIMS.1/2) as f32,(DIMS.1/10) as f32).unwrap();
     let mut samples:Vec<Point> = Vec::new();
     for _ in 0..n_points{
-        // Todo replace with normal samples
         let rx:i32 = normal_x.sample(&mut rng) as i32;
         let ry:i32 = normal_y.sample(&mut rng) as i32;
         samples.push(Point::new(rx,ry));
@@ -120,7 +119,6 @@ fn generate_random_samples(n_points:u8)-> Vec<Point>{
     let uniform_y = Uniform::from(0..DIMS.0);
     let mut samples:Vec<Point> = Vec::new();
     for _ in 0..n_points{
-        // Todo replace with random samples
         let rx:i32 = uniform_x.sample(&mut rng) as i32;
         let ry:i32 = uniform_y.sample(&mut rng) as i32;
         samples.push(Point::new(rx,ry));
@@ -128,7 +126,7 @@ fn generate_random_samples(n_points:u8)-> Vec<Point>{
     samples
 }
 
-fn save_point_vec(filename:&String, point_vec:Vec<Point>) -> std::io::Result<()>{
+fn save_point_vec(filename:&str, point_vec:Vec<Point>) -> std::io::Result<()>{
     let mut file = File::create(filename)?;
     for point in &point_vec{
         let point_str = point.to_string();
@@ -139,7 +137,7 @@ fn save_point_vec(filename:&String, point_vec:Vec<Point>) -> std::io::Result<()>
 }
 
 // Todo here and throughout - better to take &str
-fn load_point_vec(filename:&String) -> std::io::Result<Vec<Point>>{
+fn load_point_vec(filename:&str) -> std::io::Result<Vec<Point>>{
     let mut points:Vec<Point> = Vec::new();
     let mut file = File::open(filename)?;
     let mut filestring = String::new();
