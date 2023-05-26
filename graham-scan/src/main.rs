@@ -152,16 +152,6 @@ fn load_point_vec(filename:&String) -> std::io::Result<Vec<Point>>{
     Ok(points)
 }
 
-fn points_cos(base:&Point, p1:&Point)->f32{
-    // TODO: Point operators
-    let dif: Point = *p1-*base;
-    let x_axis = Point::new(1,0);
-    let mag_prod = dif.mag();
-    let dot = dif.dot(x_axis) as f32;
-    let cos = dot/mag_prod;
-    return cos;
-}
-
 fn dedup_by_angle_metric(base_point:Point, sorted_points: Vec<(Point, f32)>) -> Vec<Point>{
     // keep the furthest colinear points
     // discard the angle metric
@@ -213,11 +203,16 @@ pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
     let cand_points: Vec<(Point,f32)> = points
         .iter()
         .filter(|p| **p!=*base_point)
-        .map(|p| (*p, points_cos(p, base_point)))
+        .map(|p| (*p, Point::cos(*p-*base_point, Point::new(1,0))))
         .collect();
 
     let mut sorted_cand_points = cand_points.clone();
     sorted_cand_points.sort_by(|(_p1,angle1),(_p2,angle2)| angle1.partial_cmp(&angle2).unwrap());
+    sorted_cand_points.reverse();
+
+    for (p,a) in sorted_cand_points.iter(){
+        println!("{} {}", p, a);
+    }
 
     // 2.a remove all but one if angle is the same- keep furthest point.
     // Can't concieve how to do this with iterator functions

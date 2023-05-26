@@ -29,6 +29,13 @@ impl Point{
     pub fn cross_z(p1:Point, p2:Point, p3:Point) -> i32{
         (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x)
     }
+
+    pub fn cos(v1:Point, v2:Point)->f32{
+        let mag_prod: f32 = v1.mag()*v2.mag();
+        let dot: f32 = v1.dot(v2) as f32;
+        let cos: f32 = dot/mag_prod;
+        cos
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
