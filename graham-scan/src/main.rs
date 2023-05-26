@@ -8,7 +8,6 @@ use std::io::prelude::*;
 use std::str::FromStr;
 use std::cmp::Ordering;
 
-
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
 #[command(propagate_version = true)]
@@ -126,8 +125,7 @@ fn run(filename:&String){
     let Ok(samples) = load_point_vec(filename) else{
         panic!("Error loading from {}", filename);
     };
-    graham_scan_2(samples);
-    //graham_scan(samples);
+    graham_scan(samples);
 }
 
 
@@ -216,14 +214,25 @@ fn points_dot(p1:&Point, p2:&Point)->i32{
     return p1.x*p2.x + p1.y*p2.y;
 }
 
-fn points_cos(p1:&Point, p2:&Point)->f32{
-    let mag_prod = points_mag(&p1) * points_mag(&p2);
-    let dot = points_dot(&p1, &p2) as f32;
+fn points_cos(base:&Point, p1:&Point)->f32{
+    // TODO: Point operators
+    let dif: Point = Point{x:p1.x-base.x, y:p1.y-base.y};
+    let x_axis = Point{x:1,y:0};
+    let mag_prod = points_mag(&dif);// * points_mag(&p2);
+    let dot = points_dot(&dif, &x_axis) as f32;
     let cos = dot/mag_prod;
     return cos;
 }
 
-pub fn graham_scan_2(points: Vec<Point>) -> Vec<Point> {
+// alternative angle sorting metric
+fn _points_slope(p1: &Point, p2:&Point) -> f32{
+    //TODO refactor with proper operators
+    let dif_x : f32 = (p2.x-p1.x) as f32;
+    let dif_y : f32 = (p2.y-p1.y) as f32;
+    return dif_y/dif_x;
+}
+
+pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
     // we have a vector of points as argument
     // we have a stack of convex hull points
     // 1. we find the base point and remove it, adding to convex hull
@@ -231,25 +240,28 @@ pub fn graham_scan_2(points: Vec<Point>) -> Vec<Point> {
     // 3. we find the first point and remove it, adding to convex hull
     // 4. we loop over this vector to push to convex hull and make checks.
 
+    if points.len() < 3{
+        panic!("Minimum of 3 points required for convex hull");
+    }
+
     let mut convex_hull: Vec<Point> = vec![]; 
 
     // 1. find base
     let Some(base_point) = points.iter().min() else{
         panic!("No minimum point");
     };
-    println!("min point {}", base_point);
+    println!("base point {}", base_point);
     convex_hull.push(*base_point);
 
     // 2. angles and sort
     let cand_points: Vec<(Point,f32)> = points
         .iter()
-        .filter(|p| *p!=base_point)
+        .filter(|p| **p!=*base_point)
         .map(|p| (*p, points_cos(p, base_point)))
         .collect();
 
     let mut sorted_cand_points = cand_points.clone();
     sorted_cand_points.sort_by(|(_p1,angle1),(_p2,angle2)| angle1.partial_cmp(&angle2).unwrap());
-    sorted_cand_points.reverse();
 
     let mut candidates = sorted_cand_points.iter().map(|(p,_a)| p);
 
@@ -258,85 +270,11 @@ pub fn graham_scan_2(points: Vec<Point>) -> Vec<Point> {
         panic!("Empty candidate iter");
     };
     convex_hull.push(*first_cand);
-
     // 4. do the scan
     let mut ch_len;
     for cand in candidates{
+        convex_hull.push(*cand);
         ch_len = convex_hull.len();
-            convex_hull.push(*cand);
-            while ch_len >= 3 && is_right_turn(&convex_hull[ch_len-3..ch_len]){
-                let Some(top) = convex_hull.pop() else{
-                    panic!("Empty convex hull");
-                };
-                let Some(_discard) = convex_hull.pop() else{
-                    panic!("Empty convex hull");
-                };
-                convex_hull.push(top);
-                ch_len = convex_hull.len();
-            }
-    }
-
-    for p in convex_hull.iter(){
-        println!("{}",p);
-    }
-    println!("Final Length of convex hull over {} points {}", points.len(), convex_hull.len());
-
-    return convex_hull;
-}
-
-pub fn graham_scan(points:Vec<Point>) -> Vec<Point>{
-    // take all the points
-    // return an ordered vector of convex hull points,
-    // counterclockwise from lowest point.
-
-    // TODO: tidy this whole thing up with mega tuples in one vec?
-    // Might not be any tidier.
-
-    let i_points: Vec<(usize,&Point)> = points.iter().enumerate().collect();
-
-    let min_y_index : Option<&usize> = i_points
-        .iter()
-        .min_by(|(_, a), (_, b)| a.cmp(b))
-        .map(|(index, _)| index);
-    
-
-    let Some(idx) = min_y_index else{
-        panic!("Error finding min y");
-    };
-    let (base_id, base_point) = i_points[*idx];
-    println!("base point {} {}", base_id, base_point);
-    
-    
-    let mut angles: Vec<(usize,f32)>= i_points.iter().map(|(i,p)| (*i ,points_cos(p,&base_point))).collect();
-    // for(i,ang) in &angles{
-    //     println!("{} cos: {}",i, ang);
-    // }
-
-    // println!("Now sorting");
-    angles.sort_by(|(_i,a),(_j,b)| a.partial_cmp(&b).unwrap());
-    angles.reverse();
-    for(i,ang) in &angles{
-        println!("{} at {} cos: {}",i, i_points[*i].1, ang);
-    }
-
-    let order: Vec<usize> = angles.iter().map(|(i,_)| *i).collect();
-    let ordered_points: Vec<Point> = order.iter().map(|i| points[*i]).collect();
-
-    let mut convex_hull: Vec<Point> = vec![]; // where we're going to store our convex hull
-    // we add the lowest point, and the first one we hit as we raise angle from the x axis
-    // as these are guarunteed to be in the hull.
-    convex_hull.push(ordered_points[0]);
-    convex_hull.push(ordered_points[1]);
-    // the last element of the convex hull should be the last element of the ordered points
-    // by the same argument as that ordered_points[1] will be in the convex hull.
-    
-    println!("Starting the scan");
-
-    //do the scan.
-    let mut ch_len;
-    for i in 2..ordered_points.len(){
-        ch_len = convex_hull.len();
-        convex_hull.push(ordered_points[i]);
         while ch_len >= 3 && is_right_turn(&convex_hull[ch_len-3..ch_len]){
             let Some(top) = convex_hull.pop() else{
                 panic!("Empty convex hull");
@@ -364,7 +302,7 @@ fn is_right_turn(section: &[Point]) -> bool{
     let p1: Point = section[0];
     let p2: Point = section[1];
     let p3: Point = section[2];
-    let cross_z:i32 = (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x);   
+    let cross_z:i32 = (p2.x-p1.x)*(p3.y-p1.y) - (p2.y-p1.y)*(p3.x-p1.x); 
     return cross_z<0;
 }
 
@@ -382,9 +320,23 @@ mod tests{
     }
 
     #[test]
+    #[should_panic]
+    fn panic_1_point(){
+        let points = vec![(10,10)];
+        graham_scan(make_points(points));
+    }
+
+    #[test]
+    #[should_panic]
+    fn panic_2_point(){
+        let points = vec![(10,10), (20,10)];
+        graham_scan(make_points(points));
+    }
+    #[test]
     fn basic_square(){
-        let test_points: Vec<Point> = make_points(vec![(10,10),(50,10),(50,50),(10,50)]);
-        let expected_points: Vec<Point> = make_points(vec![(10,10),(50,10),(50,50),(10,50)]);
+        let square_points = vec![(10,10),(50,10),(50,50),(10,50)];
+        let test_points: Vec<Point> = make_points(square_points.clone());
+        let expected_points: Vec<Point> = make_points(square_points.clone());
         let res: Vec<Point> = graham_scan(test_points);
         assert_eq!(expected_points, res);
     }
