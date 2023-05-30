@@ -19,3 +19,13 @@ The algorithm takes the following steps:
 In order to check for left or right hand turns the z component of the cross product of the vectors `P1->P2` and `P1->P3` can be used. Positive values for left turn, zero for colinear, and negative for right hand turn.
 
 Once the angle for each point has been calculated, some might need to be culled. If 2 points and the base point are colinear, the nearer of the 2 points should be removed.
+
+## Learned / Used
+
+* File IO in rust
+* Logging using tracing crate
+* Basic Cargo stuff
+* Test suites
+* Separating out into modules
+* Iterator and iterator methods
+* Implementing traits for custom data types

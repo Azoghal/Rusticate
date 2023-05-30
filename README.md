@@ -7,10 +7,4 @@ Some Rust projects for learning Rust.
 
 ## Crates to use
 
-See [blessed.rs](https://blessed.rs/crates)
-
-* serde
-* serde-json
-* thiserror
-* anyhow
-* tokio
+See [blessed.rs](https://blessed.rs/crates) for key crates to learn.
