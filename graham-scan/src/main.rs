@@ -11,7 +11,7 @@ use points::Point;
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
 #[command(propagate_version = true)]
-struct CLI {
+struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
@@ -57,7 +57,7 @@ fn main() {
     // 1. Run graham scan on input file's point positions
     // 2. Sample point positions
     //   a. Specify point positions sample function
-    let cli = CLI::parse();
+    let cli = Cli::parse();
 
     match &cli.command {
         Commands::Run(args) => {
