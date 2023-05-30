@@ -10,4 +10,6 @@ authors = ["Sam Beer sam.beer208@gmail.com"]
 clap = { version = "4.3.0", features = ["derive"] }
 rand = "0.8.5"
 rand_distr = "0.4.3"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
 

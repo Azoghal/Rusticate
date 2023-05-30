@@ -4,9 +4,13 @@ use rand_distr::Normal;
 use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
+use tracing::{info, Level};
+use tracing_subscriber::FmtSubscriber;
 
 mod points;
 use points::Point;
+
+// TODO: use logging crate to more properly log details during computation.
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -61,7 +65,6 @@ fn main() {
 
     match &cli.command {
         Commands::Run(args) => {
-            //run(*args.filename);
             run(&args.filename);
         }
         Commands::Sample(args) => {
@@ -133,7 +136,6 @@ fn save_point_vec(filename: &str, point_vec: Vec<Point>) -> std::io::Result<()> 
     Ok(())
 }
 
-// Todo here and throughout - better to take &str
 fn load_point_vec(filename: &str) -> std::io::Result<Vec<Point>> {
     let mut points: Vec<Point> = Vec::new();
     let mut file = File::open(filename)?;
