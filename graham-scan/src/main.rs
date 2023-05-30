@@ -4,13 +4,11 @@ use rand_distr::Normal;
 use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
-use tracing::{info, Level};
+use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod points;
 use points::Point;
-
-// TODO: use logging crate to more properly log details during computation.
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -61,6 +59,11 @@ fn main() {
     // 1. Run graham scan on input file's point positions
     // 2. Sample point positions
     //   a. Specify point positions sample function
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
     let cli = Cli::parse();
 
     match &cli.command {
@@ -75,7 +78,7 @@ fn main() {
 
 fn run(filename: &str) {
     // runs graham scan upon points found in file
-    println!("run - input from {}", filename);
+    info!("running graham scan on input file {}", filename);
     let Ok(samples) = load_point_vec(filename) else{
         panic!("Error loading from {}", filename);
     };
@@ -84,21 +87,24 @@ fn run(filename: &str) {
 
 fn sample(filename: &str, sampler: &Sampler) {
     // samples points from specified sampler and saves to file
-    println!("sample - output to {}, sampler used {}", filename, sampler);
+    info!(
+        "sampling from {1} distribution, writing to {0}",
+        filename, sampler
+    );
     let samples: Vec<Point> = match &sampler {
         Sampler::Random => generate_random_samples(200),
         Sampler::Normal => generate_normal_samples(200),
     };
 
     match save_point_vec(filename, samples) {
-        Ok(()) => println!("Successfully wrote to {}", filename),
-        Err(e) => println!("Error writing to {}: {:?}", filename, e),
+        Ok(()) => info!("Successfully wrote to {}", filename),
+        Err(e) => error!("Error writing to {}: {:?}", filename, e),
     };
 }
 
 fn generate_normal_samples(n_points: u8) -> Vec<Point> {
     // generate a vector of n_points sampled from 2d gaussian
-    println!("sampling points from Normal");
+    info!("sampling points from Normal");
     let mut rng = rand::thread_rng();
     let normal_x = Normal::new((DIMS.0 / 2) as f32, (DIMS.0 / 10) as f32).unwrap();
     let normal_y = Normal::new((DIMS.1 / 2) as f32, (DIMS.1 / 10) as f32).unwrap();
@@ -113,7 +119,7 @@ fn generate_normal_samples(n_points: u8) -> Vec<Point> {
 
 fn generate_random_samples(n_points: u8) -> Vec<Point> {
     // generate a vector of n_points sampled from 2d gaussian
-    println!("sampling points from random uniform");
+    info!("sampling points from random uniform");
     let mut rng = rand::thread_rng();
     let uniform_x = Uniform::from(0..DIMS.0);
     let uniform_y = Uniform::from(0..DIMS.0);
@@ -193,7 +199,7 @@ pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
     let Some(base_point) = points.iter().min() else{
         panic!("No minimum point");
     };
-    println!("base point {}", base_point);
+    debug!("base point {}", base_point);
     convex_hull.push(*base_point);
 
     // 2. angles and sort
@@ -236,10 +242,11 @@ pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
         }
     }
 
-    for p in convex_hull.iter() {
-        println!("{}", p);
-    }
-    println!(
+    debug!("{:?}", convex_hull);
+    // for p in convex_hull.iter() {
+    //     debug!("{}", p);
+    // }
+    info!(
         "Final Length of convex hull over {} points {}",
         points.len(),
         convex_hull.len()
@@ -266,7 +273,7 @@ fn is_right_or_no_turn(section: &[Point]) -> bool {
     // else{
     //     message = "colinear";
     // }
-    // println!("{}->{}->{} is {}", p1,p2,p3,message);
+    // debug!("{}->{}->{} is {}", p1,p2,p3,message);
     cross_z <= 0
 }
 
