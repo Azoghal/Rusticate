@@ -242,10 +242,7 @@ pub fn graham_scan(points: Vec<Point>) -> Vec<Point> {
         }
     }
 
-    debug!("{:?}", convex_hull);
-    // for p in convex_hull.iter() {
-    //     debug!("{}", p);
-    // }
+    debug!("Final Convex Hull: {:?}", convex_hull);
     info!(
         "Final Length of convex hull over {} points {}",
         points.len(),
@@ -263,17 +260,6 @@ fn is_right_or_no_turn(section: &[Point]) -> bool {
     let p2: Point = section[1];
     let p3: Point = section[2];
     let cross_z: i32 = Point::cross_z(p1, p2, p3);
-    //let message;
-    // if cross_z<0{
-    //     message = "right turn";
-    // }
-    // else if cross_z >0 {
-    //     message = "left turn";
-    // }
-    // else{
-    //     message = "colinear";
-    // }
-    // debug!("{}->{}->{} is {}", p1,p2,p3,message);
     cross_z <= 0
 }
 
