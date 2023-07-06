@@ -1,9 +1,27 @@
 use base64::engine::general_purpose;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
+
+#[derive(Debug, Copy, Clone, ValueEnum)]
+enum Alphabet {
+    Ascii,
+    // TODO add more
+}
+
+#[derive(Debug)]
+struct LzwSpec {
+    alphabet: Alphabet,
+    variable_width: bool,
+    min_width: u8,
+    max_width: u8,
+    end_code: bool,
+    clear_code: bool,
+    pack_msb_first: bool,
+    early_change: bool,
+}
 
 // TODO: do fancier exclusive fields? min and max code width only needed for variable width.
 #[derive(Parser)]
@@ -13,11 +31,17 @@ struct Args {
     #[arg(default_value = "encoded.txt")]
     filename: String,
 
+    #[arg(value_enum, default_value_t=Alphabet::Ascii)]
+    alphabet: Alphabet,
+
     #[arg(default_value_t = false)]
     variable_width: bool,
 
     #[arg(default_value_t = true)]
     end_code: bool,
+
+    #[arg(default_value_t = true)]
+    clear_code: bool,
 
     #[arg(default_value_t = 16)] // requires variable-width true
     max_width: u8,
@@ -28,11 +52,43 @@ struct Args {
 
     #[arg(default_value_t = true)]
     pack_msb_first: bool,
+
+    #[arg(default_value_t = false)]
+    early_change: bool,
+}
+
+fn main() {
+    let subscriber: FmtSubscriber = FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    let args = Args::parse();
+    let spec = LzwSpec {
+        alphabet: args.alphabet,
+        variable_width: args.variable_width,
+        min_width: args.min_width,
+        max_width: args.max_width,
+        end_code: args.end_code,
+        clear_code: args.clear_code,
+        pack_msb_first: args.pack_msb_first,
+        early_change: args.early_change,
+    };
+    compress(spec);
+    b64_encode_to_file(&args.filename).unwrap();
+    b64_decode_from_file(&args.filename).unwrap();
 }
 
 // https://planetcalc.com/9069/
 
-fn compress() {}
+// TODO take a structure which is the specification
+fn compress(spec: LzwSpec) {
+    // Initialize alphabet
+    // Initialize dictionary from alphabet
+    let dict = produce_dictionary(spec);
+    // Initialize Trie from dictionary
+    // Repeatedly read, evaluate from input, Emit to output
+}
 
 fn decompress() {}
 
@@ -56,13 +112,17 @@ fn b64_encode_to_file(filename: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-fn main() {
-    let subscriber: FmtSubscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+fn generate_ascii() -> Vec<char> {
+    let ascii: Vec<char> = Vec::new();
+    ascii
+}
 
-    let args = Args::parse();
-    b64_encode_to_file(&args.filename).unwrap();
-    b64_decode_from_file(&args.filename).unwrap();
+fn produce_alphabet(alpha: Alphabet) -> Vec<char> {
+    match alpha {
+        Alphabet::Ascii => generate_ascii(),
+    }
+}
+
+fn produce_dictionary(spec: LzwSpec) {
+    let alpha = produce_alphabet(spec.alphabet);
 }
