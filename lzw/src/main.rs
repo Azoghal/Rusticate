@@ -1,9 +1,11 @@
+use base64::alphabet;
 use base64::engine::general_purpose;
 use clap::{Parser, ValueEnum};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
+mod trie_dictionary;
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
 enum Alphabet {
@@ -81,10 +83,8 @@ fn main() {
 
 // https://planetcalc.com/9069/
 
-// TODO take a structure which is the specification
 fn compress(spec: LzwSpec) {
-    // Initialize alphabet
-    // Initialize dictionary from alphabet
+    // Initialize dictionary from spec
     let dict = produce_dictionary(spec);
     // Initialize Trie from dictionary
     // Repeatedly read, evaluate from input, Emit to output
@@ -113,10 +113,12 @@ fn b64_encode_to_file(filename: &str) -> std::io::Result<()> {
 }
 
 fn generate_ascii() -> Vec<char> {
-    let ascii: Vec<char> = Vec::new();
-    ascii
+    let printable_chars: String = String::from(" !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+    let alphabet: Vec<char> = printable_chars.chars().collect();
+    alphabet
 }
 
+//TODO in future refactor to Vec<Token> so that non text files e.g. images can be compressed.
 fn produce_alphabet(alpha: Alphabet) -> Vec<char> {
     match alpha {
         Alphabet::Ascii => generate_ascii(),
@@ -125,4 +127,5 @@ fn produce_alphabet(alpha: Alphabet) -> Vec<char> {
 
 fn produce_dictionary(spec: LzwSpec) {
     let alpha = produce_alphabet(spec.alphabet);
+    // Trie
 }
