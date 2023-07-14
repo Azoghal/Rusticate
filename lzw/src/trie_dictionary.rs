@@ -2,6 +2,9 @@
 // https://docs.rs/trie-rs/latest/trie_rs/
 // https://crates.io/crates/louds-rs
 
+use crate::alphabets;
+use crate::Alphabet;
+use crate::LzwSpec;
 use std::collections::HashMap;
 
 // TODO implement own trie with hashtable
@@ -53,7 +56,9 @@ pub struct TrieNode {
 
 pub struct TrieDictionary {
     root: TrieNode,
-    alphabet: Vec<char>,
+    // alphabet: Vec<char>,
+    clear_code: bool,
+    end_code: bool,
 }
 
 impl TrieNode {
@@ -75,7 +80,7 @@ impl TrieNode {
         }
     }
 
-    pub fn addChild(&mut self, val: &char, sequence_code: Code, terminator: bool) {
+    pub fn add_child(&mut self, val: &char, sequence_code: Code, terminator: bool) {
         self.children
             .insert(*val, TrieNode::new(*val, sequence_code, terminator));
     }
@@ -87,12 +92,12 @@ impl TrieDictionary {
     pub fn fetch_code_and_insert(&mut self, search_seq: &[char], next_code: Code) -> Code {
         let mut current_node = &mut self.root;
         let mut fetched_code: Option<Code> = Option::None;
-        for label in search_seq.iter() {
-            if current_node.children.contains_key(label) {
-                current_node = current_node.children.get_mut(label).unwrap();
+        for symbol in search_seq.iter() {
+            if current_node.children.contains_key(symbol) {
+                current_node = current_node.children.get_mut(symbol).unwrap();
             } else {
                 fetched_code = current_node.value;
-                current_node.addChild(label, next_code, true);
+                current_node.add_child(symbol, next_code, true);
                 current_node.terminator = false;
             }
         }
@@ -100,5 +105,64 @@ impl TrieDictionary {
             Some(code) => code,
             None => panic!("didn't fetch a code"),
         }
+    }
+
+    pub fn new(lzw_spec: LzwSpec) -> TrieDictionary {
+        let mut new_trie = TrieDictionary {
+            root: TrieNode::new_root(),
+            // alphabet,
+            clear_code: lzw_spec.clear_code,
+            end_code: lzw_spec.end_code,
+        };
+        let alphabet: Vec<char> = alphabets::produce_alphabet(lzw_spec.alphabet);
+        //
+        for symbol in alphabet.iter() {
+            let code = Code::new();
+            new_trie.root.add_child(symbol, code, true)
+        }
+        new_trie
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    fn build_starting_dictionary() -> TrieDictionary {
+        let lzw_spec: LzwSpec = LzwSpec {
+            alphabet: Alphabet::Ascii,
+            variable_width: false,
+            min_width: 12,
+            max_width: 12,
+            end_code: true,
+            clear_code: true,
+            pack_msb_first: true,
+            early_change: false,
+        };
+        TrieDictionary::new(lzw_spec)
+    }
+
+    #[test]
+    fn fetch_existing_code() {
+        let mut dict = build_starting_dictionary();
+
+        let fetched_code = dict.fetch_code_and_insert(
+            &['a', 'b'],
+            Code {
+                code: 1,
+                used_bits: 12,
+            },
+        );
+        assert_eq!(fetched_code.code, 0);
+        let inserted_and_fetched_code = dict.fetch_code_and_insert(
+            &['a', 'b', 'c'],
+            Code {
+                code: 2,
+                used_bits: 12,
+            },
+        );
+        assert_eq!(inserted_and_fetched_code.code, 1);
+        assert_eq!(inserted_and_fetched_code.used_bits, 12);
     }
 }

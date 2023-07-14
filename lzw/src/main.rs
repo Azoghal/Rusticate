@@ -5,16 +5,11 @@ use std::fs::File;
 use std::io::{Read, Write};
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
+mod alphabets;
 mod trie_dictionary;
 
-#[derive(Debug, Copy, Clone, ValueEnum)]
-enum Alphabet {
-    Ascii,
-    // TODO add more
-}
-
 #[derive(Debug)]
-struct LzwSpec {
+pub struct LzwSpec {
     alphabet: Alphabet,
     variable_width: bool,
     min_width: u8,
@@ -59,6 +54,12 @@ struct Args {
     early_change: bool,
 }
 
+#[derive(Debug, Copy, Clone, ValueEnum)]
+pub enum Alphabet {
+    Ascii,
+    // TODO add more
+}
+
 fn main() {
     let subscriber: FmtSubscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
@@ -85,7 +86,7 @@ fn main() {
 
 fn compress(spec: LzwSpec) {
     // Initialize dictionary from spec
-    let dict = produce_dictionary(spec);
+    let dict = trie_dictionary::TrieDictionary::new(spec);
     // Initialize Trie from dictionary
     // Repeatedly read, evaluate from input, Emit to output
 }
@@ -110,22 +111,4 @@ fn b64_encode_to_file(filename: &str) -> std::io::Result<()> {
     let mut encoder = base64::write::EncoderWriter::new(&mut f, &general_purpose::STANDARD);
     encoder.write_all(s)?;
     Ok(())
-}
-
-fn generate_ascii() -> Vec<char> {
-    let printable_chars: String = String::from(" !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
-    let alphabet: Vec<char> = printable_chars.chars().collect();
-    alphabet
-}
-
-//TODO in future refactor to Vec<Token> so that non text files e.g. images can be compressed.
-fn produce_alphabet(alpha: Alphabet) -> Vec<char> {
-    match alpha {
-        Alphabet::Ascii => generate_ascii(),
-    }
-}
-
-fn produce_dictionary(spec: LzwSpec) {
-    let alpha = produce_alphabet(spec.alphabet);
-    // Trie
 }
