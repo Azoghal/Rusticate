@@ -5,7 +5,8 @@ use std::io::{Read, Write};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 mod alphabets;
-mod lzw_codes;
+mod lzw_code;
+mod lzw_token;
 mod trie_dictionary;
 
 #[derive(Debug, Copy, Clone)]
@@ -92,7 +93,7 @@ fn main() {
 
 fn compress(spec: LzwSpec) {
     // Initialize dictionary from spec
-    let mut code_gen = lzw_codes::CodeGenerator::new(spec);
+    let mut code_gen = lzw_code::CodeGenerator::new(spec);
     let dict = trie_dictionary::TrieDictionary::new(spec, &mut code_gen);
     // Initialize Trie from dictionary
     // Repeatedly read, evaluate from input, Emit to output
