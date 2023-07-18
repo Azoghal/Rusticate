@@ -1,17 +1,18 @@
-use base64::alphabet;
 use base64::engine::general_purpose;
 use clap::{Parser, ValueEnum};
 use std::fs::File;
 use std::io::{Read, Write};
-use tracing::{error, info, Level};
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 mod alphabets;
+mod lzw_codes;
 mod trie_dictionary;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct LzwSpec {
-    alphabet: Alphabet,
+    alphabet: alphabets::Alphabet,
     variable_width: bool,
+    width: u8,
     min_width: u8,
     max_width: u8,
     end_code: bool,
@@ -28,11 +29,14 @@ struct Args {
     #[arg(default_value = "encoded.txt")]
     filename: String,
 
-    #[arg(value_enum, default_value_t=Alphabet::Ascii)]
-    alphabet: Alphabet,
+    #[arg(value_enum, default_value_t=ArgAlphabet::Ascii)]
+    alphabet: ArgAlphabet,
 
     #[arg(default_value_t = false)]
     variable_width: bool,
+
+    #[arg(default_value_t = 12)]
+    width: u8,
 
     #[arg(default_value_t = true)]
     end_code: bool,
@@ -40,12 +44,12 @@ struct Args {
     #[arg(default_value_t = true)]
     clear_code: bool,
 
-    #[arg(default_value_t = 16)] // requires variable-width true
-    max_width: u8,
-
-    #[arg(default_value_t = 9)]
+    #[arg(default_value_t = 8)]
     // requires variable-width true. Commonly inferred from alphabet rather than specified
     min_width: u8,
+
+    #[arg(default_value_t = 16)] // requires variable-width true
+    max_width: u8,
 
     #[arg(default_value_t = true)]
     pack_msb_first: bool,
@@ -55,7 +59,8 @@ struct Args {
 }
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
-pub enum Alphabet {
+pub enum ArgAlphabet {
+    _Test,
     Ascii,
     // TODO add more
 }
@@ -68,8 +73,9 @@ fn main() {
 
     let args = Args::parse();
     let spec = LzwSpec {
-        alphabet: args.alphabet,
+        alphabet: alphabets::Alphabet::new(args.alphabet),
         variable_width: args.variable_width,
+        width: args.width,
         min_width: args.min_width,
         max_width: args.max_width,
         end_code: args.end_code,
@@ -86,7 +92,8 @@ fn main() {
 
 fn compress(spec: LzwSpec) {
     // Initialize dictionary from spec
-    let dict = trie_dictionary::TrieDictionary::new(spec);
+    let mut code_gen = lzw_codes::CodeGenerator::new(spec);
+    let dict = trie_dictionary::TrieDictionary::new(spec, &mut code_gen);
     // Initialize Trie from dictionary
     // Repeatedly read, evaluate from input, Emit to output
 }

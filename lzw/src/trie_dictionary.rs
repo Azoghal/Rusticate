@@ -3,11 +3,10 @@
 // https://crates.io/crates/louds-rs
 
 use crate::alphabets;
-use crate::Alphabet;
+use crate::lzw_codes;
 use crate::LzwSpec;
 use std::collections::HashMap;
 
-// TODO implement own trie with hashtable
 // TODO implement with generics
 // TODO compare speed against trie_rs
 
@@ -30,26 +29,9 @@ The trie is ideal as the *sequential* lookup/search takes linear time, and still
     or all of the non-starting-dictionary elements are removed when the max code size is reached.
     In this case, we can just reinitialize the dictionary
 */
-
-#[derive(Copy, Clone)]
-pub struct Code {
-    code: i32,
-    used_bits: u8, // how many bits of the 32 bit integer actually constitute the code
-}
-
-impl Code {
-    pub fn new() -> Code {
-        // TODO replace
-        Code {
-            code: 0,
-            used_bits: 0,
-        }
-    }
-}
-
 pub struct TrieNode {
     key: Option<char>,
-    value: Option<Code>,
+    value: Option<lzw_codes::Code>,
     terminator: bool,
     children: HashMap<char, TrieNode>,
 }
@@ -62,7 +44,7 @@ pub struct TrieDictionary {
 }
 
 impl TrieNode {
-    pub fn new(key: char, sequence_code: Code, terminator: bool) -> TrieNode {
+    pub fn new(key: char, sequence_code: lzw_codes::Code, terminator: bool) -> TrieNode {
         TrieNode {
             key: Option::Some(key),
             value: Some(sequence_code),
@@ -80,7 +62,7 @@ impl TrieNode {
         }
     }
 
-    pub fn add_child(&mut self, val: &char, sequence_code: Code, terminator: bool) {
+    pub fn add_child(&mut self, val: &char, sequence_code: lzw_codes::Code, terminator: bool) {
         self.children
             .insert(*val, TrieNode::new(*val, sequence_code, terminator));
     }
@@ -89,9 +71,13 @@ impl TrieNode {
 impl TrieDictionary {
     // really we want a reference to an iterator
     // or make the struct more stateful and expose a step(char) or similar
-    pub fn fetch_code_and_insert(&mut self, search_seq: &[char], next_code: Code) -> Code {
+    pub fn fetch_code_and_insert(
+        &mut self,
+        search_seq: &[char],
+        next_code: lzw_codes::Code,
+    ) -> lzw_codes::Code {
         let mut current_node = &mut self.root;
-        let mut fetched_code: Option<Code> = Option::None;
+        let mut fetched_code: Option<lzw_codes::Code> = Option::None;
         for symbol in search_seq.iter() {
             if current_node.children.contains_key(symbol) {
                 current_node = current_node.children.get_mut(symbol).unwrap();
@@ -107,18 +93,52 @@ impl TrieDictionary {
         }
     }
 
-    pub fn new(lzw_spec: LzwSpec) -> TrieDictionary {
+    pub fn search(self, search_seq: &[char]) -> Option<lzw_codes::Code> {
+        let mut current_node = &self.root;
+        for symbol in search_seq.iter() {
+            if current_node.children.contains_key(symbol) {
+                current_node = current_node.children.get(symbol).unwrap();
+            } else {
+                return None;
+            }
+        }
+        current_node.value
+    }
+
+    pub fn insert(&mut self, input_seq: &[char], sequence_code: lzw_codes::Code) {
+        let mut current_node = &mut self.root;
+        for symbol in input_seq.iter() {
+            if current_node.children.contains_key(symbol) {
+                current_node = current_node.children.get_mut(symbol).unwrap();
+            } else {
+                // Add child, move down into it
+                current_node.add_child(symbol, sequence_code, true);
+                current_node.terminator = false;
+                current_node = current_node.children.get_mut(symbol).unwrap();
+            }
+        }
+    }
+
+    pub fn new(lzw_spec: LzwSpec, code_gen: &mut lzw_codes::CodeGenerator) -> TrieDictionary {
         let mut new_trie = TrieDictionary {
             root: TrieNode::new_root(),
             // alphabet,
             clear_code: lzw_spec.clear_code,
             end_code: lzw_spec.end_code,
         };
+
+        // TODO make alphabets vec of something more than char so non-character escape codes etc
         let alphabet: Vec<char> = alphabets::produce_alphabet(lzw_spec.alphabet);
-        //
+
         for symbol in alphabet.iter() {
-            let code = Code::new();
-            new_trie.root.add_child(symbol, code, true)
+            let code_result: Option<lzw_codes::Code> = code_gen.get_next_code();
+            match code_result {
+                None => panic!("Base alphabet too large for starting bit width"),
+                Some(code) => {
+                    new_trie.root.add_child(symbol, code, true);
+                    println!("code: {}", code);
+                }
+            }
         }
         new_trie
     }
@@ -128,41 +148,62 @@ impl TrieDictionary {
 mod tests {
 
     use super::*;
+    use crate::lzw_codes::CodeGenerator;
 
-    fn build_starting_dictionary() -> TrieDictionary {
-        let lzw_spec: LzwSpec = LzwSpec {
-            alphabet: Alphabet::Ascii,
-            variable_width: false,
-            min_width: 12,
-            max_width: 12,
-            end_code: true,
-            clear_code: true,
-            pack_msb_first: true,
-            early_change: false,
-        };
-        TrieDictionary::new(lzw_spec)
+    const TEST_SPEC: LzwSpec = LzwSpec {
+        alphabet: alphabets::Alphabet::_Test,
+        variable_width: false,
+        width: 12,
+        min_width: 12,
+        max_width: 12,
+        end_code: true,
+        clear_code: true,
+        pack_msb_first: true,
+        early_change: false,
+    };
+
+    const ASCII_SPEC: LzwSpec = LzwSpec {
+        alphabet: alphabets::Alphabet::Ascii,
+        variable_width: false,
+        width: 12,
+        min_width: 12,
+        max_width: 12,
+        end_code: true,
+        clear_code: true,
+        pack_msb_first: true,
+        early_change: false,
+    };
+
+    #[test]
+    fn insert_seqs() {
+        let mut code_gen = CodeGenerator::new(TEST_SPEC);
+        let mut dict = TrieDictionary::new(TEST_SPEC, &mut code_gen);
+        let code = code_gen.get_next_code().unwrap();
+        dict.insert(&['a'], code);
+        match dict.search(&['a']) {
+            None => panic!("Expected entry not in dict"),
+            Some(code_result) => assert_eq!(code, code_result),
+        }
     }
 
     #[test]
     fn fetch_existing_code() {
-        let mut dict = build_starting_dictionary();
+        let mut code_gen = CodeGenerator::new(ASCII_SPEC);
+        let mut dict = TrieDictionary::new(ASCII_SPEC, &mut code_gen);
 
-        let fetched_code = dict.fetch_code_and_insert(
-            &['a', 'b'],
-            Code {
-                code: 1,
-                used_bits: 12,
-            },
-        );
-        assert_eq!(fetched_code.code, 0);
-        let inserted_and_fetched_code = dict.fetch_code_and_insert(
-            &['a', 'b', 'c'],
-            Code {
-                code: 2,
-                used_bits: 12,
-            },
-        );
-        assert_eq!(inserted_and_fetched_code.code, 1);
-        assert_eq!(inserted_and_fetched_code.used_bits, 12);
+        let Some(code) = code_gen.get_next_code() else{
+            panic!("Out of codes");
+        };
+        println!("Code for first insert and fetch {}", code);
+
+        let fetched_code = dict.fetch_code_and_insert(&['a', 'b'], code);
+        assert_eq!(fetched_code.get_code(), 65);
+
+        let Some(code) = code_gen.get_next_code() else{
+            panic!("Out of codes");
+        };
+        println!("Code for second insert and fetch {}", code);
+        let inserted_and_fetched_code = dict.fetch_code_and_insert(&['a', 'b', 'c'], code);
+        assert_eq!(inserted_and_fetched_code.get_code(), 95);
     }
 }
