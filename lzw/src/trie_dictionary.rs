@@ -3,7 +3,7 @@
 // https://crates.io/crates/louds-rs
 
 use crate::alphabets;
-use crate::lzw_codes;
+use crate::lzw_code;
 use crate::LzwSpec;
 use std::collections::HashMap;
 
@@ -31,7 +31,7 @@ The trie is ideal as the *sequential* lookup/search takes linear time, and still
 */
 pub struct TrieNode {
     key: Option<char>,
-    value: Option<lzw_codes::Code>,
+    value: Option<lzw_code::Code>,
     terminator: bool,
     children: HashMap<char, TrieNode>,
 }
@@ -44,7 +44,7 @@ pub struct TrieDictionary {
 }
 
 impl TrieNode {
-    pub fn new(key: char, sequence_code: lzw_codes::Code, terminator: bool) -> TrieNode {
+    pub fn new(key: char, sequence_code: lzw_code::Code, terminator: bool) -> TrieNode {
         TrieNode {
             key: Option::Some(key),
             value: Some(sequence_code),
@@ -62,7 +62,7 @@ impl TrieNode {
         }
     }
 
-    pub fn add_child(&mut self, val: &char, sequence_code: lzw_codes::Code, terminator: bool) {
+    pub fn add_child(&mut self, val: &char, sequence_code: lzw_code::Code, terminator: bool) {
         self.children
             .insert(*val, TrieNode::new(*val, sequence_code, terminator));
     }
@@ -74,10 +74,10 @@ impl TrieDictionary {
     pub fn fetch_code_and_insert(
         &mut self,
         search_seq: &[char],
-        next_code: lzw_codes::Code,
-    ) -> lzw_codes::Code {
+        next_code: lzw_code::Code,
+    ) -> lzw_code::Code {
         let mut current_node = &mut self.root;
-        let mut fetched_code: Option<lzw_codes::Code> = Option::None;
+        let mut fetched_code: Option<lzw_code::Code> = Option::None;
         for symbol in search_seq.iter() {
             if current_node.children.contains_key(symbol) {
                 current_node = current_node.children.get_mut(symbol).unwrap();
@@ -93,7 +93,7 @@ impl TrieDictionary {
         }
     }
 
-    pub fn search(self, search_seq: &[char]) -> Option<lzw_codes::Code> {
+    pub fn search(self, search_seq: &[char]) -> Option<lzw_code::Code> {
         let mut current_node = &self.root;
         for symbol in search_seq.iter() {
             if current_node.children.contains_key(symbol) {
@@ -105,7 +105,7 @@ impl TrieDictionary {
         current_node.value
     }
 
-    pub fn insert(&mut self, input_seq: &[char], sequence_code: lzw_codes::Code) {
+    pub fn insert(&mut self, input_seq: &[char], sequence_code: lzw_code::Code) {
         let mut current_node = &mut self.root;
         for symbol in input_seq.iter() {
             if current_node.children.contains_key(symbol) {
@@ -119,7 +119,7 @@ impl TrieDictionary {
         }
     }
 
-    pub fn new(lzw_spec: LzwSpec, code_gen: &mut lzw_codes::CodeGenerator) -> TrieDictionary {
+    pub fn new(lzw_spec: LzwSpec, code_gen: &mut lzw_code::CodeGenerator) -> TrieDictionary {
         let mut new_trie = TrieDictionary {
             root: TrieNode::new_root(),
             // alphabet,
@@ -131,7 +131,7 @@ impl TrieDictionary {
         let alphabet: Vec<char> = alphabets::produce_alphabet(lzw_spec.alphabet);
 
         for symbol in alphabet.iter() {
-            let code_result: Option<lzw_codes::Code> = code_gen.get_next_code();
+            let code_result: Option<lzw_code::Code> = code_gen.get_next_code();
             match code_result {
                 None => panic!("Base alphabet too large for starting bit width"),
                 Some(code) => {
@@ -148,7 +148,7 @@ impl TrieDictionary {
 mod tests {
 
     use super::*;
-    use crate::lzw_codes::CodeGenerator;
+    use crate::lzw_code::CodeGenerator;
 
     const TEST_SPEC: LzwSpec = LzwSpec {
         alphabet: alphabets::Alphabet::_Test,
