@@ -1,5 +1,6 @@
 use base64::engine::general_purpose;
-use clap::{Parser, ValueEnum};
+use clap::{Args, Parser, ValueEnum};
+use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use tracing::Level;
@@ -8,6 +9,7 @@ mod alphabets;
 mod lzw_code;
 mod lzw_token;
 mod trie_dictionary;
+use trie_dictionary::TrieDictionary;
 
 #[derive(Debug, Copy, Clone)]
 pub struct LzwSpec {
@@ -26,14 +28,14 @@ pub struct LzwSpec {
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
 // #[command(propagate_version = true)]
-struct Args {
+struct LzwArgs {
     #[arg(default_value = "encoded.txt")]
     filename: String,
 
     #[arg(value_enum, default_value_t=ArgAlphabet::Ascii)]
     alphabet: ArgAlphabet,
 
-    #[arg(default_value_t = false)]
+    #[arg(default_value = "false")]
     variable_width: bool,
 
     #[arg(default_value_t = 12)]
@@ -67,12 +69,13 @@ pub enum ArgAlphabet {
 }
 
 fn main() {
+    env::set_var("RUST_BACKTRACE", "1");
     let subscriber: FmtSubscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    let args = Args::parse();
+    let args = LzwArgs::parse();
     let spec = LzwSpec {
         alphabet: alphabets::Alphabet::new(args.alphabet),
         variable_width: args.variable_width,
@@ -94,7 +97,7 @@ fn main() {
 fn compress(spec: LzwSpec) {
     // Initialize dictionary from spec
     let mut code_gen = lzw_code::CodeGenerator::new(spec);
-    let dict = trie_dictionary::TrieDictionary::new(spec, &mut code_gen);
+    let dict: TrieDictionary<char> = TrieDictionary::new(spec, &mut code_gen);
     // Initialize Trie from dictionary
     // Repeatedly read, evaluate from input, Emit to output
 }

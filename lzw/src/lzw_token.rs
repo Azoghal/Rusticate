@@ -2,54 +2,46 @@
 // For example the end and clear code
 // Or non-text files e.g. images
 
-use std::any::Any;
+pub trait HashableToken: Eq + PartialEq + Copy + Hash {}
+impl<T: Eq + PartialEq + Copy + Hash> HashableToken for T {}
 
-trait Token<T> {
-    fn get_value(&self) -> Option<T>;
+use std::cmp::{Eq, PartialEq};
+use std::hash::Hash;
+
+// https://stackoverflow.com/questions/26070559/is-there-any-way-to-create-a-type-alias-for-multiple-traits
+
+#[derive(Eq, PartialEq, Hash, Copy, Clone)]
+pub enum ControlToken {
+    END,
+    CLEAR,
 }
 
-// Special Tokens
+#[derive(Eq, PartialEq, Hash, Copy, Clone)]
+pub struct Token<T: HashableToken> {
+    value: Option<T>,
+    control_token: Option<ControlToken>,
+}
 
-struct EndCodeToken {}
-
-impl<T> Token<T> for EndCodeToken {
-    fn get_value(&self) -> Option<T> {
-        None
+impl<T: HashableToken> Token<T> {
+    pub fn new(value: T) -> Token<T> {
+        Token {
+            value: Some(value),
+            control_token: None,
+        }
     }
-}
 
-struct ClearCodeToken {}
-
-impl<T> Token<T> for ClearCodeToken {
-    fn get_value(&self) -> Option<T> {
-        None
+    pub fn new_control(control_token: ControlToken) -> Token<T> {
+        Token {
+            value: None,
+            control_token: Some(control_token),
+        }
     }
-}
 
-// Generic Tokens
-
-struct GenToken<T> {
-    value: T,
-}
-
-impl<T> Token<T> for GenToken<T>
-where
-    T: Copy,
-{
     fn get_value(&self) -> Option<T> {
-        Some(self.value)
+        self.value
     }
 }
 
 // Specific Tokens
 
-// Type for any ascii token
-// struct AsciiToken {
-//     value: char,
-// }
-
-// impl Token<char> for AsciiToken {
-//     fn get_value(&self) -> Option<char> {
-//         Some(self.value)
-//     }
-// }
+// pub type AsciiToken = Token<char>;
