@@ -82,7 +82,7 @@ impl<T: HashableToken> TrieDictionary<T> {
     pub fn fetch_code_and_insert(
         &mut self,
         search_seq: &[Token<T>],
-        next_code: lzw_code::Code,
+        next_code: lzw_code::Code, // TODO: Take a reference to the code generator so that codes advance only when needed
     ) -> lzw_code::Code {
         let mut current_node = &mut self.root;
         let mut fetched_code: Option<lzw_code::Code> = Option::None;
@@ -226,22 +226,6 @@ mod tests {
     };
 
     #[test]
-    fn control_hashed() {
-        let ascii_char = Token::<char>::new('a');
-        let clear = Token::<char>::new_control(lzw_token::ControlToken::Clear);
-        let end = Token::<char>::new_control(lzw_token::ControlToken::End);
-
-        let mut my_map: HashMap<Token<char>, u8> = HashMap::new();
-
-        my_map.insert(ascii_char, 17);
-        my_map.insert(clear, 27);
-        my_map.insert(end, 39);
-
-        println!("Number of key value pairs: {}", my_map.len());
-        assert_ne!(my_map.get(&ascii_char), my_map.get(&clear))
-    }
-
-    #[test]
     fn search_initial_dict() {
         let alphabet = alphabets::generate_ascii();
         let alpha_len = alphabet.len();
@@ -271,6 +255,21 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn search_not_present() {
+        let alphabet = alphabets::generate_ascii();
+        let mut code_gen = CodeGenerator::new(ASCII_SPEC);
+        let dict = TrieDictionary::new(ASCII_SPEC, &mut code_gen, alphabet);
+
+        let tok_seq = &[Token::new('A'), Token::new('B')];
+        let expected_code = code_gen.get_next_code().unwrap();
+        match dict._search(tok_seq) {
+            None => panic!("Expected End CODE not in dict"),
+            Some(code_result) => assert_eq!(expected_code, code_result),
+        }
+    }
+
+    #[test]
     fn insert_test() {
         let alphabet = alphabets::generate_ascii();
         let mut code_gen = CodeGenerator::new(ASCII_SPEC);
@@ -285,24 +284,41 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn fetch_existing_code() {
-    //     let mut code_gen = CodeGenerator::new(ASCII_SPEC);
-    //     let mut dict = TrieDictionary::new(ASCII_SPEC, &mut code_gen);
+    #[test]
+    fn insert_already_present() {
+        let alphabet = alphabets::generate_ascii();
+        let mut code_gen = CodeGenerator::new(ASCII_SPEC);
+        let mut dict = TrieDictionary::new(ASCII_SPEC, &mut code_gen, alphabet);
 
-    //     let Some(code) = code_gen.get_next_code() else{
-    //         panic!("Out of codes");
-    //     };
-    //     println!("Code for first insert and fetch {}", code);
+        let tok_seq = &[Token::new('A'), Token::new('B')];
+        let expected_code = code_gen.get_next_code().unwrap();
+        dict._insert(tok_seq, expected_code);
 
-    //     let fetched_code = dict.fetch_code_and_insert(&['a', 'b'], code);
-    //     assert_eq!(fetched_code.get_code(), 65);
+        let unexpected_code = code_gen.get_next_code().unwrap();
+        dict._insert(tok_seq, unexpected_code);
 
-    //     let Some(code) = code_gen.get_next_code() else{
-    //         panic!("Out of codes");
-    //     };
-    //     println!("Code for second insert and fetch {}", code);
-    //     let inserted_and_fetched_code = dict.fetch_code_and_insert(&['a', 'b', 'c'], code);
-    //     assert_eq!(inserted_and_fetched_code.get_code(), 95);
-    // }
+        match dict._search(tok_seq) {
+            None => panic!("Expected End CODE not in dict"),
+            Some(code_result) => assert_eq!(expected_code, code_result),
+        }
+    }
+
+    #[test]
+    fn fetch_and_insert() {
+        let alphabet = alphabets::generate_ascii();
+        let mut code_gen = CodeGenerator::new(ASCII_SPEC);
+        let mut dict = TrieDictionary::new(ASCII_SPEC, &mut code_gen, alphabet);
+
+        let existing_sub_seq = &[Token::new('A')];
+        let expected_fetched_code = dict._search(existing_sub_seq).unwrap();
+
+        let fetch_insert_seq = &[Token::new('A'), Token::new('B')];
+        let expected_insert_code = code_gen.get_next_code().unwrap();
+        let fetched_code = dict.fetch_code_and_insert(fetch_insert_seq, expected_insert_code);
+
+        assert_eq!(expected_fetched_code, fetched_code);
+
+        let inserted_code = dict._search(fetch_insert_seq).unwrap();
+        assert_eq!(expected_insert_code, inserted_code);
+    }
 }
