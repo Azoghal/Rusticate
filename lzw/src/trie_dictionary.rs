@@ -30,6 +30,8 @@ The trie is ideal as the *sequential* lookup/search takes linear time, and still
     or all of the non-starting-dictionary elements are removed when the max code size is reached.
     In this case, we can just reinitialize the dictionary
 */
+
+#[derive(Debug)]
 pub struct TrieNode<T: HashableToken> {
     key: Option<Token<T>>,
     value: Option<lzw_code::Code>,
@@ -64,8 +66,13 @@ impl<T: HashableToken> TrieNode<T> {
     }
 
     pub fn add_child(&mut self, val: Token<T>, sequence_code: lzw_code::Code, terminator: bool) {
-        self.children
+        let inserted = self
+            .children
             .insert(val, TrieNode::new(val, sequence_code, terminator));
+        match inserted {
+            None => {}
+            Some(old) => println!("Already had an entry!!! : {:?}", old),
+        }
     }
 }
 
@@ -94,7 +101,7 @@ impl<T: HashableToken> TrieDictionary<T> {
         }
     }
 
-    pub fn search(self, search_seq: &[Token<T>]) -> Option<lzw_code::Code> {
+    pub fn _search(&self, search_seq: &[Token<T>]) -> Option<lzw_code::Code> {
         let mut current_node = &self.root;
         for symbol in search_seq.iter() {
             if current_node.children.contains_key(symbol) {
@@ -106,7 +113,7 @@ impl<T: HashableToken> TrieDictionary<T> {
         current_node.value
     }
 
-    pub fn insert(&mut self, input_seq: &[Token<T>], sequence_code: lzw_code::Code) {
+    pub fn _insert(&mut self, input_seq: &[Token<T>], sequence_code: lzw_code::Code) {
         let mut current_node = &mut self.root;
         for symbol in input_seq.iter() {
             if current_node.children.contains_key(symbol) {
@@ -123,7 +130,7 @@ impl<T: HashableToken> TrieDictionary<T> {
     pub fn new(
         lzw_spec: LzwSpec,
         code_gen: &mut lzw_code::CodeGenerator,
-        // alphabet: & alphabets::Alphabet,
+        alphabet: Vec<Token<T>>,
     ) -> TrieDictionary<T> {
         let mut new_trie = TrieDictionary {
             root: TrieNode::new_root(),
@@ -132,19 +139,55 @@ impl<T: HashableToken> TrieDictionary<T> {
             end_code: lzw_spec.end_code,
         };
 
-        // TODO make alphabets vec of something more than char so non-character escape codes etc
-        // let alphabet: Vec<Token<char>> = alphabets::generate_ascii();
+        println!("Size of initial dictionary before alphabet: {}", {
+            new_trie.root.children.len()
+        });
 
-        // for symbol in alphabet.iter() {
-        //     let code_result: Option<lzw_code::Code> = code_gen.get_next_code();
-        //     match code_result {
-        //         None => panic!("Base alphabet too large for starting bit width"),
-        //         Some(code) => {
-        //             new_trie.root.add_child(*symbol, code, true);
-        //             println!("code: {}", code);
-        //         }
-        //     }
-        // }
+        // ADD the alphabet
+        for symbol in alphabet.iter() {
+            if let Some(code) = code_gen.get_next_code() {
+                new_trie.root.add_child(*symbol, code, true);
+                //println!("code: {}", code);
+            } else {
+                panic!("Base alphabet too large for starting bit width");
+            }
+        }
+
+        println!("Size of initial dictionary before control: {}", {
+            new_trie.root.children.len()
+        });
+
+        // ADD the clear code control character
+        if lzw_spec.clear_code {
+            if let Some(code) = code_gen.get_next_code() {
+                new_trie.root.add_child(
+                    Token::new_control(crate::lzw_token::ControlToken::Clear),
+                    code,
+                    true,
+                );
+                println!("code END: {}", code);
+            } else {
+                panic!("Base alphabet too large for starting bit width");
+            }
+        }
+
+        // ADD the end code control character
+        if lzw_spec.end_code {
+            if let Some(code) = code_gen.get_next_code() {
+                new_trie.root.add_child(
+                    Token::new_control(crate::lzw_token::ControlToken::End),
+                    code,
+                    true,
+                );
+                println!("code END: {}", code);
+            } else {
+                panic!("Base alphabet too large for starting bit width");
+            }
+        }
+
+        println!("Size of initial dictionary: {}", {
+            new_trie.root.children.len()
+        });
         new_trie
     }
 }
@@ -153,9 +196,12 @@ impl<T: HashableToken> TrieDictionary<T> {
 mod tests {
 
     use super::*;
-    use crate::lzw_code::CodeGenerator;
+    use crate::{
+        lzw_code::{Code, CodeGenerator},
+        lzw_token,
+    };
 
-    const TEST_SPEC: LzwSpec = LzwSpec {
+    const _TEST_SPEC: LzwSpec = LzwSpec {
         alphabet: alphabets::Alphabet::_Test,
         variable_width: false,
         width: 12,
@@ -179,17 +225,65 @@ mod tests {
         early_change: false,
     };
 
-    // #[test]
-    // fn insert_seqs() {
-    //     let mut code_gen = CodeGenerator::new(TEST_SPEC);
-    //     let mut dict = TrieDictionary::new(TEST_SPEC, &mut code_gen);
-    //     let code = code_gen.get_next_code().unwrap();
-    //     dict.insert(&['a'], code);
-    //     match dict.search(&['a']) {
-    //         None => panic!("Expected entry not in dict"),
-    //         Some(code_result) => assert_eq!(code, code_result),
-    //     }
-    // }
+    #[test]
+    fn control_hashed() {
+        let ascii_char = Token::<char>::new('a');
+        let clear = Token::<char>::new_control(lzw_token::ControlToken::Clear);
+        let end = Token::<char>::new_control(lzw_token::ControlToken::End);
+
+        let mut my_map: HashMap<Token<char>, u8> = HashMap::new();
+
+        my_map.insert(ascii_char, 17);
+        my_map.insert(clear, 27);
+        my_map.insert(end, 39);
+
+        println!("Number of key value pairs: {}", my_map.len());
+        assert_ne!(my_map.get(&ascii_char), my_map.get(&clear))
+    }
+
+    #[test]
+    fn search_initial_dict() {
+        let alphabet = alphabets::generate_ascii();
+        let alpha_len = alphabet.len();
+        let mut code_gen = CodeGenerator::new(ASCII_SPEC);
+        let dict = TrieDictionary::new(ASCII_SPEC, &mut code_gen, alphabet);
+
+        let mut ver_code_gen = CodeGenerator::new(ASCII_SPEC);
+        let mut other_alphabet = alphabets::generate_ascii();
+        other_alphabet.reverse();
+        for _ in 0..alpha_len {
+            let a_token = other_alphabet.pop().unwrap();
+            match dict._search(&[a_token]) {
+                None => panic!("Expected entry not in dict"),
+                Some(code_result) => assert_eq!(ver_code_gen.get_next_code().unwrap(), code_result),
+            }
+        }
+        match dict._search(&[lzw_token::Token::new_control(
+            lzw_token::ControlToken::Clear,
+        )]) {
+            None => panic!("Expected Clear CODE not in dict"),
+            Some(code_result) => assert_eq!(ver_code_gen.get_next_code().unwrap(), code_result),
+        }
+        match dict._search(&[lzw_token::Token::new_control(lzw_token::ControlToken::End)]) {
+            None => panic!("Expected End CODE not in dict"),
+            Some(code_result) => assert_eq!(ver_code_gen.get_next_code().unwrap(), code_result),
+        }
+    }
+
+    #[test]
+    fn insert_test() {
+        let alphabet = alphabets::generate_ascii();
+        let mut code_gen = CodeGenerator::new(ASCII_SPEC);
+        let mut dict = TrieDictionary::new(ASCII_SPEC, &mut code_gen, alphabet);
+
+        let tok_seq = &[Token::new('A'), Token::new('B')];
+        let expected_code = code_gen.get_next_code().unwrap();
+        dict._insert(tok_seq, expected_code);
+        match dict._search(tok_seq) {
+            None => panic!("Expected End CODE not in dict"),
+            Some(code_result) => assert_eq!(expected_code, code_result),
+        }
+    }
 
     // #[test]
     // fn fetch_existing_code() {

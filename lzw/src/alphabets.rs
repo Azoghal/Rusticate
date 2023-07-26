@@ -1,4 +1,4 @@
-use crate::lzw_token::{ControlToken, Token};
+use crate::lzw_token::{ControlToken, HashableToken, Token};
 use crate::ArgAlphabet;
 
 #[derive(Debug, Copy, Clone)]
@@ -17,8 +17,8 @@ impl Alphabet {
     }
 }
 
-//TODO in future refactor to Vec<Token> so that non text files e.g. images can be compressed.
-// pub fn produce_alphabet(alpha: Alphabet) -> Vec<Token> {
+// TODO: fix this if it is needed?
+// pub fn produce_alphabet(alpha: Alphabet) -> Box<dynVec<Token<T>> {
 //     match alpha {
 //         Alphabet::_Test => generate_test_alphabet(),
 //         Alphabet::Ascii => generate_ascii(),
@@ -28,14 +28,12 @@ impl Alphabet {
 pub fn generate_ascii() -> Vec<Token<char>> {
     let printable_chars: String = String::from(" !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
     let alphabet = printable_chars.chars();
-    let mut res: Vec<Token<char>> = alphabet.map(|c| Token::new(c)).collect();
-    res.push(Token::new_control(ControlToken::CLEAR));
-    res.push(Token::new_control(ControlToken::END));
+    let res: Vec<Token<char>> = alphabet.map(Token::new).collect();
     println!("Length of initial alphabet {}", res.len());
     res
 }
 
-fn generate_test_alphabet<T>() -> Vec<T> {
-    let alphabet: Vec<T> = Vec::new();
-    alphabet
-}
+// fn generate_test_alphabet<T>() -> Vec<T> {
+//     let alphabet: Vec<T> = Vec::new();
+//     alphabet
+// }

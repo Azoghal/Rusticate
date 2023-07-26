@@ -68,7 +68,7 @@ pub enum ArgAlphabet {
 }
 
 fn main() {
-    env::set_var("RUST_BACKTRACE", "1");
+    // env::set_var("RUST_BACKTRACE", "1");
     let subscriber: FmtSubscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         .finish();
@@ -96,7 +96,8 @@ fn main() {
 fn compress(spec: LzwSpec) {
     // Initialize dictionary from spec
     let mut code_gen = lzw_code::CodeGenerator::new(spec);
-    let dict: TrieDictionary<char> = TrieDictionary::new(spec, &mut code_gen);
+    let alphabet = alphabets::generate_ascii();
+    let dict = TrieDictionary::new(spec, &mut code_gen, alphabet);
     // Initialize Trie from dictionary
     // Repeatedly read, evaluate from input, Emit to output
 }
