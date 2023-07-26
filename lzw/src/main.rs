@@ -29,36 +29,35 @@ pub struct LzwSpec {
 #[command(author, version, about, long_about=None)]
 // #[command(propagate_version = true)]
 struct LzwArgs {
+    #[arg(short, long)]
+    end_code: bool,
+
+    #[arg(short, long)]
+    clear_code: bool,
+
+    #[arg(short, long)]
+    variable_width: bool,
+
+    #[arg(short, long)]
+    pack_msb_first: bool,
+
+    #[arg(long)]
+    early_change: bool,
+
     #[arg(default_value = "encoded.txt")]
     filename: String,
 
     #[arg(value_enum, default_value_t=ArgAlphabet::Ascii)]
     alphabet: ArgAlphabet,
 
-    #[arg(default_value = "false")]
-    variable_width: bool,
-
     #[arg(default_value_t = 12)]
     width: u8,
 
-    #[arg(default_value_t = true)]
-    end_code: bool,
-
-    #[arg(default_value_t = true)]
-    clear_code: bool,
-
     #[arg(default_value_t = 8)]
-    // requires variable-width true. Commonly inferred from alphabet rather than specified
     min_width: u8,
 
     #[arg(default_value_t = 16)] // requires variable-width true
     max_width: u8,
-
-    #[arg(default_value_t = true)]
-    pack_msb_first: bool,
-
-    #[arg(default_value_t = false)]
-    early_change: bool,
 }
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
