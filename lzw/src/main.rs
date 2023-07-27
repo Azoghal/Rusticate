@@ -94,11 +94,11 @@ fn main() {
 // https://planetcalc.com/9069/
 
 fn compress(spec: LzwSpec) {
-    // Initialize dictionary from spec
     let mut code_gen = lzw_code::CodeGenerator::new(spec);
-    let alphabet = alphabets::generate_ascii();
+    let alphabet = alphabets::generate_ascii(); //TODO generate from the spec
     let dict = TrieDictionary::new(spec, &mut code_gen, alphabet);
-    // Initialize Trie from dictionary
+
+    let test_source: Vec<char> = "tobeornottobetobeornottobe".chars().collect();
     // Repeatedly read, evaluate from input, Emit to output
 }
 

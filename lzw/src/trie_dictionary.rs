@@ -76,6 +76,22 @@ impl<T: HashableToken> TrieNode<T> {
     }
 }
 
+// TODO: struct for result of fetch_code_and_insert -> need to know how many tokens consumed
+
+pub struct LookupResult {
+    code: lzw_code::Code,
+    consumed_tokens: u32, // TODO establish neccessary size
+}
+
+impl LookupResult {
+    fn new(code: lzw_code::Code, consumed_tokens: u32) -> LookupResult {
+        LookupResult {
+            code,
+            consumed_tokens,
+        }
+    }
+}
+
 impl<T: HashableToken> TrieDictionary<T> {
     // really we want a reference to an iterator
     // or make the struct more stateful and expose a step(char) or similar
@@ -83,12 +99,14 @@ impl<T: HashableToken> TrieDictionary<T> {
         &mut self,
         search_seq: &[Token<T>],
         next_code: lzw_code::Code, // TODO: Take a reference to the code generator so that codes advance only when needed
-    ) -> lzw_code::Code {
+    ) -> LookupResult {
         let mut current_node = &mut self.root;
         let mut fetched_code: Option<lzw_code::Code> = Option::None;
+        let mut consumed_tokens: u32 = 0;
         for symbol in search_seq.iter() {
             if current_node.children.contains_key(symbol) {
                 current_node = current_node.children.get_mut(symbol).unwrap();
+                consumed_tokens += 1;
             } else {
                 fetched_code = current_node.value;
                 current_node.add_child(*symbol, next_code, true);
@@ -96,7 +114,7 @@ impl<T: HashableToken> TrieDictionary<T> {
             }
         }
         match fetched_code {
-            Some(code) => code,
+            Some(code) => LookupResult::new(code, consumed_tokens),
             None => panic!("didn't fetch a code"),
         }
     }
@@ -196,10 +214,7 @@ impl<T: HashableToken> TrieDictionary<T> {
 mod tests {
 
     use super::*;
-    use crate::{
-        lzw_code::{Code, CodeGenerator},
-        lzw_token,
-    };
+    use crate::{lzw_code::CodeGenerator, lzw_token};
 
     const _TEST_SPEC: LzwSpec = LzwSpec {
         alphabet: alphabets::Alphabet::_Test,
@@ -314,9 +329,13 @@ mod tests {
 
         let fetch_insert_seq = &[Token::new('A'), Token::new('B')];
         let expected_insert_code = code_gen.get_next_code().unwrap();
-        let fetched_code = dict.fetch_code_and_insert(fetch_insert_seq, expected_insert_code);
+        let fetched_result = dict.fetch_code_and_insert(fetch_insert_seq, expected_insert_code);
 
-        assert_eq!(expected_fetched_code, fetched_code);
+        assert_eq!(expected_fetched_code, fetched_result.code);
+        assert_eq!(
+            fetch_insert_seq.len() as u32 - 1, // n-1 tokens should be consumed
+            fetched_result.consumed_tokens
+        );
 
         let inserted_code = dict._search(fetch_insert_seq).unwrap();
         assert_eq!(expected_insert_code, inserted_code);
