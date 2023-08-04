@@ -1,5 +1,5 @@
 use base64::engine::general_purpose;
-use clap::{Args, Parser, ValueEnum};
+use clap::{ArgAction, Args, Parser, ValueEnum};
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -25,6 +25,7 @@ pub struct LzwSpec {
 }
 
 // TODO: do fancier exclusive fields? min and max code width only needed for variable width.
+// TODO: Have a second option to point to a
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
 // #[command(propagate_version = true)]
@@ -35,13 +36,13 @@ struct LzwArgs {
     #[arg(short, long)]
     clear_code: bool,
 
-    #[arg(short, long)]
+    #[arg(short, long, action=ArgAction::SetFalse)]
     variable_width: bool,
 
-    #[arg(short, long)]
+    #[arg(short, long)] // TODO: work out what correct default is
     pack_msb_first: bool,
 
-    #[arg(long)]
+    #[arg(long, action=ArgAction::SetFalse)]
     early_change: bool,
 
     #[arg(default_value = "encoded.txt")]
@@ -87,25 +88,29 @@ fn main() {
         early_change: args.early_change,
     };
     compress(spec);
-    b64_encode_to_file(&args.filename).unwrap();
-    b64_decode_from_file(&args.filename).unwrap();
+    // b64_encode_to_file(&args.filename).unwrap();
+    // b64_decode_from_file(&args.filename).unwrap();
 }
 
 // https://planetcalc.com/9069/
 
 fn compress(spec: LzwSpec) {
+    tracing::debug!("Starting compression");
     let mut code_gen = lzw_code::CodeGenerator::new(spec);
     let alphabet = alphabets::generate_ascii(); //TODO generate from the spec
     let dict = TrieDictionary::new(spec, &mut code_gen, alphabet);
 
-    let test_source: Vec<char> = "tobeornottobetobeornottobe".chars().collect();
+    //let test_source: Vec<char> = "tobeornottobetobeornottobe".chars().collect();
     // Repeatedly read, evaluate from input, Emit to output
 }
 
-fn decompress() {}
+fn decompress() {
+    tracing::debug!("Starting decompression")
+}
 
 fn b64_decode_from_file(filename: &str) -> std::io::Result<()> {
     // File is in b64 encoding
+    tracing::debug!("Decoding {} from b64 to u8 characters", filename);
     let mut f = File::open(filename)?;
     let mut decoder = base64::read::DecoderReader::new(&mut f, &general_purpose::STANDARD);
 
@@ -117,6 +122,7 @@ fn b64_decode_from_file(filename: &str) -> std::io::Result<()> {
 }
 
 fn b64_encode_to_file(filename: &str) -> std::io::Result<()> {
+    tracing::debug!("Encoding from u8 characters to b64 in {}", filename);
     let s = b"thetest";
     let mut f: File = File::create(filename)?;
     let mut encoder = base64::write::EncoderWriter::new(&mut f, &general_purpose::STANDARD);

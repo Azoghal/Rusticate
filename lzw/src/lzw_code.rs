@@ -57,6 +57,7 @@ impl CodeGenerator {
         }
     }
 
+    // TODO replace with result and relevant error type
     pub fn get_next_code(&mut self) -> Option<Code> {
         // Check that current bit width is respected
         if self.current_code >> self.width != 0 {

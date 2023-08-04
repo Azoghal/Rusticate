@@ -2,11 +2,39 @@
 // For example the end and clear code
 // Or non-text files e.g. images
 
+use std::cmp::{Eq, PartialEq};
+use std::hash::Hash;
+
 pub trait HashableToken: Eq + PartialEq + Copy + Hash + std::fmt::Debug {}
 impl<T: Eq + PartialEq + Copy + Hash + std::fmt::Debug> HashableToken for T {}
 
-use std::cmp::{Eq, PartialEq};
-use std::hash::Hash;
+pub trait ValToken: HashableToken {}
+impl<T: HashableToken> ValToken for T {}
+
+// An LzwToken is either a value token (subject of compression) or a control character
+// Any value token must be hashable etc.
+#[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
+pub enum LzwToken<T>
+where
+    T: ValToken,
+{
+    Control(ControlToken),
+    Value(T),
+}
+
+impl<T: ValToken> LzwToken<T> {
+    pub fn new_control_end() -> LzwToken<T> {
+        LzwToken::Control(ControlToken::End)
+    }
+
+    pub fn new_control_clear() -> LzwToken<T> {
+        LzwToken::Control(ControlToken::Clear)
+    }
+
+    pub fn new(val: T) -> LzwToken<T> {
+        LzwToken::Value(val)
+    }
+}
 
 // https://stackoverflow.com/questions/26070559/is-there-any-way-to-create-a-type-alias-for-multiple-traits
 
@@ -16,36 +44,8 @@ pub enum ControlToken {
     Clear,
 }
 
-#[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
-pub struct Token<T: HashableToken> {
-    value: Option<T>,
-    control_token: Option<ControlToken>,
-}
-
-impl<T: HashableToken> Token<T> {
-    pub fn new(value: T) -> Token<T> {
-        Token {
-            value: Some(value),
-            control_token: None,
-        }
-    }
-
-    pub fn new_control(control_token: ControlToken) -> Token<T> {
-        Token {
-            value: None,
-            control_token: Some(control_token),
-        }
-    }
-
-    fn get_value(&self) -> Option<T> {
-        self.value
-    }
-
-    pub fn get_control(self) -> Option<ControlToken> {
-        self.control_token
-    }
-}
-
 // Specific Tokens
+
+pub type AsciiToken = LzwToken<char>;
 
 // pub type AsciiToken = Token<char>;

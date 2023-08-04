@@ -1,4 +1,4 @@
-use crate::lzw_token::{ControlToken, HashableToken, Token};
+use crate::lzw_token::AsciiToken;
 use crate::ArgAlphabet;
 
 #[derive(Debug, Copy, Clone)]
@@ -25,11 +25,11 @@ impl Alphabet {
 //     }
 // }
 
-pub fn generate_ascii() -> Vec<Token<char>> {
+pub fn generate_ascii() -> Vec<AsciiToken> {
+    tracing::debug!("Creating Ascii Printable Alphabet");
     let printable_chars: String = String::from(" !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
     let alphabet = printable_chars.chars();
-    let res: Vec<Token<char>> = alphabet.map(Token::new).collect();
-    println!("Length of initial alphabet {}", res.len());
+    let res: Vec<AsciiToken> = alphabet.map(AsciiToken::new).collect();
     res
 }
 
