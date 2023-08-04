@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::collections::HashMap;
-use tracing::{error, info, Level};
+use std::env;
+use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser)]
@@ -12,6 +13,7 @@ struct Args {
 }
 
 fn main() -> Result<(), TrieError> {
+    env::set_var("RUST_BACKTRACE", "1");
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         .finish();
@@ -23,31 +25,28 @@ fn main() -> Result<(), TrieError> {
         args.num_nodes
     );
 
-    let mut root = TrieNode::new(None, None);
-    let mut chars = root.insert("abc".chars(), "Hooray".to_string())?;
-    tracing::info!("Successfully added");
-    tracing::info!("All of chars used? {}", chars.next().is_none());
-    let (res_val, chars) = root.search("ab".chars())?;
-    tracing::info!(
-        "Searched for ab: Res: {:?}, remaining chars: {:?}",
-        res_val,
-        chars
-    );
     Ok(())
 }
 
 #[derive(Debug)]
 enum TrieError {
     Search(String),
-    Insert(String),
-    Lzw(String),
+    // Insert(String),
+    // Lzw(String),
 }
 
+#[derive(Debug)]
 struct TrieNode {
     key: Option<char>,
     value: Option<String>,
     children: HashMap<char, TrieNode>,
 }
+
+// TODO:: fix the test.
+// TODO:: derive and implement display for TrieNode.
+// TODO:: Try the https://stackoverflow.com/questions/29296038/implementing-a-mutable-tree-structure imperative.
+// TODO:: Implement the LZW functionality.
+// TODO:: Migrate to generic hashable tokens
 
 impl TrieNode {
     pub fn new(key: Option<char>, value: Option<String>) -> TrieNode {
@@ -93,6 +92,11 @@ impl TrieNode {
             if let Some(node) = self.children.get(&key) {
                 node.search(key_it)
             } else {
+                tracing::error!(
+                    "Searched for a sequence not present - does the key match? {:?} {}",
+                    self.key,
+                    key
+                );
                 Err(TrieError::Search(
                     "Searched for sequence not present".to_string(),
                 ))
@@ -113,4 +117,31 @@ impl TrieNode {
 }
 
 #[cfg(test)]
-mod test {}
+mod test {
+    use super::*;
+    #[test]
+    fn search_insert_search() {
+        let mut root = TrieNode::new(None, None);
+        // Search for non existant sequence
+        let Err(_) = root.search("abc".chars()) else{
+        tracing::error!("Expected failed search"); 
+        panic!("Expected failed search");
+    };
+
+        // Insert what we were looking for
+        let mut chars = root.insert("abc".chars(), "Hooray".to_string()).unwrap();
+        assert_eq!(chars.next(), None);
+
+        tracing::debug!("{:?}", root);
+
+        // Search again to find it
+        let (result, mut chars) = root.search("abc".chars()).unwrap();
+        assert_eq!(result, Some("Hooray".to_string()));
+        assert_eq!(chars.next(), None);
+
+        // Search for a subsequence and receive a None option
+        let (result, mut chars) = root.search("ab".chars()).unwrap();
+        assert_eq!(result, None);
+        assert_eq!(chars.next(), None);
+    }
+}
