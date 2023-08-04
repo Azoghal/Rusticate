@@ -8,8 +8,8 @@ use tracing_subscriber::FmtSubscriber;
 mod alphabets;
 mod lzw_code;
 mod lzw_token;
-mod trie_dictionary;
-use trie_dictionary::TrieDictionary;
+mod vec_trie;
+use vec_trie::TrieDictionary;
 
 #[derive(Debug, Copy, Clone)]
 pub struct LzwSpec {
