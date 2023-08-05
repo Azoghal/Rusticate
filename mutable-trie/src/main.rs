@@ -42,7 +42,8 @@ struct TrieNode {
     children: HashMap<char, TrieNode>,
 }
 
-// TODO:: fix the test.
+// TODO:: fix the test - proper error handling
+// TODO:: benchmark the two approaches for speed.
 // TODO:: derive and implement display for TrieNode.
 // TODO:: Try the https://stackoverflow.com/questions/29296038/implementing-a-mutable-tree-structure imperative.
 // TODO:: Implement the LZW functionality.
@@ -58,7 +59,23 @@ impl TrieNode {
         }
     }
 
-    pub fn insert<I>(&mut self, mut key_it: I, value: String) -> Result<I, TrieError>
+    pub fn new_tail<I>(mut keys: I, value: String) -> TrieNode
+    where
+        I: Iterator<Item = char>,
+    {
+        let mut top_node = TrieNode::new(keys.next(), None);
+        let mut last_node = &mut top_node;
+        for key in keys {
+            last_node = { last_node }
+                .children
+                .entry(key)
+                .or_insert(TrieNode::new(Some(key), None));
+        }
+        last_node.value = Some(value);
+        top_node
+    }
+
+    pub fn insert<I>(&mut self, mut key_it: I, value: String) -> Result<(), TrieError>
     where
         I: Iterator<Item = char>,
     {
@@ -73,18 +90,18 @@ impl TrieNode {
                 Some(val) => {
                     tracing::info!("Insert sequence exhausted, entry already in trie. Updating value of node\n{} -> {}",val, value);
                     self.value = Some(value);
-                    Ok(key_it)
+                    Ok(())
                 }
                 None => {
                     tracing::info!("Inserting new value to trie, {}", value);
                     self.value = Some(value);
-                    Ok(key_it)
+                    Ok(())
                 }
             }
         }
     }
 
-    pub fn search<I>(&self, mut key_it: I) -> Result<(Option<String>, I), TrieError>
+    pub fn search<I>(&self, mut key_it: I) -> Result<Option<String>, TrieError>
     where
         I: Iterator<Item = char>,
     {
@@ -105,89 +122,271 @@ impl TrieNode {
             match &self.value {
                 Some(val) => {
                     // tracing::info!("searched for sequence has value: {}", val);
-                    Ok((Some(val.to_string()), key_it))
+                    Ok(Some(val.to_string()))
                 }
                 None => {
                     tracing::info!("Searched for sequence has no value");
-                    Ok((None, key_it))
+                    Ok(None)
                 }
             }
         }
     }
 }
 
-fn insert_iter<I>(mut root: TrieNode, mut key_it: I, value: String) -> Result<I, TrieError>
+fn insert_iter<I>(root: &mut TrieNode, mut key_it: I, value: String) -> Result<(), TrieError>
 where
     I: Iterator<Item = char>,
 {
-    // descend
-    let mut node = &mut root;
-    let mut k = key_it.next().unwrap();
-    while node.children.contains_key(&k) {
-        node = { node }.children.get_mut(&k).unwrap();
-        k = key_it.next().unwrap();
-    }
-    node.children.insert(k, TrieNode::new(Some(k), Some(value)));
+    let mut node = root;
 
-    Ok(key_it)
+    let mut key = key_it.next();
+    let Some(mut k) = key else{
+        return Err(TrieError::Insert("Empty character sequence".to_string()))
+    };
+    while node.children.contains_key(&k) {
+        node = { node }
+            .children
+            .get_mut(&k)
+            .expect("child corresponding to contained key not found.");
+        key = key_it.next();
+        match key {
+            Some(new_k) => k = new_k,
+            None => break, // Here we know we've reached end - just insert...
+        }
+    }
+    // Either we're in the node that the value is destined for (None), or we need to make a path to a new node
+    match key {
+        None => {
+            tracing::info!(
+                "Think we're in the correct node with key {:?}. Updating value {:?} -> {}",
+                node.key,
+                node.value,
+                value
+            );
+            node.value = Some(value)
+        }
+        Some(k) => {
+            tracing::info!(
+                "Required path not in trie, making tail starting at node with key {:?}",
+                node.key
+            );
+            node.children.insert(
+                k,
+                TrieNode::new_tail(k.to_string().chars().chain(key_it), value),
+            );
+        }
+    }
+    Ok(())
 }
 
-fn search_iter<I>(root: TrieNode, mut key_it: I) -> Result<(Option<String>, I), TrieError>
+fn search_iter<I>(root: &TrieNode, mut key_it: I) -> Result<Option<String>, TrieError>
 where
     I: Iterator<Item = char>,
 {
     // descend
-    let mut node = &root;
-    let mut k = key_it.next().unwrap();
+    let mut node = root;
+
+    let mut key = key_it.next();
+    let Some(mut k) = key else{
+        return Err(TrieError::Search("No search sequence".to_string()));
+    };
     while node.children.contains_key(&k) {
         node = node.children.get(&k).unwrap();
-        k = key_it.next().unwrap();
+        key = key_it.next();
+        match key {
+            Some(new_k) => k = new_k,
+            None => break,
+        }
     }
-    Ok((node.value.clone(), key_it))
+    match key {
+        Some(more_k) => {
+            tracing::info!(
+                "No such sequence in trie, {} not a child of current node",
+                more_k
+            );
+            Ok(None)
+        }
+        None => {
+            tracing::info!("found the value");
+            Ok(node.value.clone())
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use tracing_test::traced_test;
+
     use super::*;
+    #[traced_test]
     #[test]
-    fn search_insert_search() {
-        let mut root = TrieNode::new(None, None);
-        // Search for non existant sequence
-        let Err(_) = root.search("abc".chars()) else{
-            tracing::error!("Expected failed search"); 
-            panic!("Expected failed search");
-        };
-
-        // Insert what we were looking for
-        let mut chars = root.insert("abc".chars(), "Hooray".to_string()).unwrap();
-        assert_eq!(chars.next(), None);
-
-        tracing::debug!("{:?}", root);
-
-        // Search again to find it
-        let (result, mut chars) = root.search("abc".chars()).unwrap();
-        assert_eq!(result, Some("Hooray".to_string()));
-        assert_eq!(chars.next(), None);
-
-        // Search for a subsequence and receive a None option
-        let (result, mut chars) = root.search("ab".chars()).unwrap();
-        assert_eq!(result, None);
-        assert_eq!(chars.next(), None);
-    }
-
-    #[test]
-    fn search_insert_search_iter() {
+    fn test_insert() {
         let mut root = TrieNode::new(None, None);
 
         // Insert what we were looking for
-        let mut chars = root.insert("abc".chars(), "Hooray".to_string()).unwrap();
-        assert_eq!(chars.next(), None);
+        root.insert("a".chars(), "Hooray".to_string())
+            .expect("Error in root.insert");
 
         tracing::debug!("{:?}", root);
 
-        // Search again to find it
-        let (result, mut chars) = root.search("abc".chars()).unwrap();
-        assert_eq!(result, Some("Hooray".to_string()));
-        assert_eq!(chars.next(), None);
+        assert_eq!(
+            root.children
+                .entry('a')
+                .or_insert(TrieNode::new(None, None))
+                .value,
+            Some("Hooray".to_string())
+        );
+
+        root.insert("abc".chars(), "Deeper".to_string())
+            .expect("Error during insert");
+
+        // First assert that an intermediate node with a key but no value was created
+        let intermediate = root
+            .children
+            .entry('a')
+            .or_insert(TrieNode::new(None, None))
+            .children
+            .entry('b')
+            .or_insert(TrieNode::new(
+                Some('X'),
+                Some("Should't have this".to_string()),
+            ));
+
+        assert_eq!(intermediate.key, Some('b'));
+        assert_eq!(intermediate.value, None);
+
+        // Now assert that the leaf node has the correct key and value
+        let leaf = intermediate.children.entry('c').or_insert(TrieNode::new(
+            Some('X'),
+            Some("Should't have this".to_string()),
+        ));
+
+        assert_eq!(leaf.key, Some('c'));
+        assert_eq!(leaf.value, Some("Deeper".to_string()));
     }
+
+    #[traced_test]
+    #[test]
+    fn test_search() {
+        let mut root = TrieNode::new(None, None);
+        let target_str = "MockValue";
+        root.children
+            .insert('a', TrieNode::new(Some('a'), Some(target_str.to_string())));
+
+        tracing::debug!("{:?}", root);
+
+        let searched_val = root
+            .search("a".chars())
+            .expect("Error during search")
+            .unwrap();
+        assert_eq!(searched_val, target_str.to_string());
+
+        let target_str = "Deeper";
+        let mut intermediate = TrieNode::new(Some('b'), None);
+        intermediate
+            .children
+            .insert('c', TrieNode::new(Some('c'), Some(target_str.to_string())));
+
+        root.children
+            .entry('a')
+            .or_insert(TrieNode::new(None, None))
+            .children
+            .insert('b', intermediate);
+
+        let searched_val = root.search("ab".chars()).expect("Error during search");
+        assert_eq!(searched_val, None);
+
+        let searched_val = root
+            .search("abc".chars())
+            .expect("Error during search")
+            .unwrap();
+        assert_eq!(searched_val, target_str.to_string());
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_insert_iter() {
+        let mut root = TrieNode::new(None, None);
+
+        // Insert what we were looking for
+        insert_iter(&mut root, "a".chars(), "Hooray".to_string())
+            .expect("Error during insert_iter");
+
+        tracing::debug!("{:?}", root);
+
+        assert_eq!(
+            root.children
+                .entry('a')
+                .or_insert(TrieNode::new(None, None))
+                .value,
+            Some("Hooray".to_string())
+        );
+
+        insert_iter(&mut root, "abc".chars(), "Deeper".to_string())
+            .expect("Error during insert iter");
+
+        // First assert that an intermediate node with a key but no value was created
+        let intermediate = root
+            .children
+            .entry('a')
+            .or_insert(TrieNode::new(None, None))
+            .children
+            .entry('b')
+            .or_insert(TrieNode::new(
+                Some('X'),
+                Some("Should't have this".to_string()),
+            ));
+
+        assert_eq!(intermediate.key, Some('b'));
+        assert_eq!(intermediate.value, None);
+
+        // Now assert that the leaf node has the correct key and value
+        let leaf = intermediate.children.entry('c').or_insert(TrieNode::new(
+            Some('X'),
+            Some("Should't have this".to_string()),
+        ));
+
+        assert_eq!(leaf.key, Some('c'));
+        assert_eq!(leaf.value, Some("Deeper".to_string()));
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_search_iter() {
+        let mut root = TrieNode::new(None, None);
+        let target_str = "MockValue";
+        root.children
+            .insert('a', TrieNode::new(Some('a'), Some(target_str.to_string())));
+
+        tracing::debug!("{:?}", root);
+
+        let searched_val = search_iter(&root, "a".chars())
+            .expect("Error during search")
+            .unwrap();
+        assert_eq!(searched_val, target_str.to_string());
+
+        let target_str = "Deeper";
+        let mut intermediate = TrieNode::new(Some('b'), None);
+        intermediate
+            .children
+            .insert('c', TrieNode::new(Some('c'), Some(target_str.to_string())));
+
+        root.children
+            .entry('a')
+            .or_insert(TrieNode::new(None, None))
+            .children
+            .insert('b', intermediate);
+
+        let searched_val = search_iter(&root, "ab".chars()).expect("Error during search");
+        assert_eq!(searched_val, None);
+
+        let searched_val = search_iter(&root, "abc".chars())
+            .expect("Error during search")
+            .unwrap();
+        assert_eq!(searched_val, target_str.to_string());
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_new_tail() {}
 }
