@@ -2,11 +2,11 @@
 extern crate rocket;
 
 #[get("/")]
-fn index() -> &'static str {
-    "Hello World 🦀"
+async fn index() -> String{
+    String::from("Hello World! 🦀")
 }
 
 #[launch]
-fn rocket() -> _ {
+fn rocket()-> _ {
     rocket::build().mount("/", routes![index])
 }
