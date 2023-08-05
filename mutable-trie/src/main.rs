@@ -31,8 +31,8 @@ fn main() -> Result<(), TrieError> {
 #[derive(Debug)]
 enum TrieError {
     Search(String),
-    // Insert(String),
-    // Lzw(String),
+    Insert(String),
+    Lzw(String),
 }
 
 #[derive(Debug)]
@@ -116,6 +116,36 @@ impl TrieNode {
     }
 }
 
+fn insert_iter<I>(mut root: TrieNode, mut key_it: I, value: String) -> Result<I, TrieError>
+where
+    I: Iterator<Item = char>,
+{
+    // descend
+    let mut node = &mut root;
+    let mut k = key_it.next().unwrap();
+    while node.children.contains_key(&k) {
+        node = { node }.children.get_mut(&k).unwrap();
+        k = key_it.next().unwrap();
+    }
+    node.children.insert(k, TrieNode::new(Some(k), Some(value)));
+
+    Ok(key_it)
+}
+
+fn search_iter<I>(root: TrieNode, mut key_it: I) -> Result<(Option<String>, I), TrieError>
+where
+    I: Iterator<Item = char>,
+{
+    // descend
+    let mut node = &root;
+    let mut k = key_it.next().unwrap();
+    while node.children.contains_key(&k) {
+        node = node.children.get(&k).unwrap();
+        k = key_it.next().unwrap();
+    }
+    Ok((node.value.clone(), key_it))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -124,9 +154,9 @@ mod test {
         let mut root = TrieNode::new(None, None);
         // Search for non existant sequence
         let Err(_) = root.search("abc".chars()) else{
-        tracing::error!("Expected failed search"); 
-        panic!("Expected failed search");
-    };
+            tracing::error!("Expected failed search"); 
+            panic!("Expected failed search");
+        };
 
         // Insert what we were looking for
         let mut chars = root.insert("abc".chars(), "Hooray".to_string()).unwrap();
@@ -142,6 +172,22 @@ mod test {
         // Search for a subsequence and receive a None option
         let (result, mut chars) = root.search("ab".chars()).unwrap();
         assert_eq!(result, None);
+        assert_eq!(chars.next(), None);
+    }
+
+    #[test]
+    fn search_insert_search_iter() {
+        let mut root = TrieNode::new(None, None);
+
+        // Insert what we were looking for
+        let mut chars = root.insert("abc".chars(), "Hooray".to_string()).unwrap();
+        assert_eq!(chars.next(), None);
+
+        tracing::debug!("{:?}", root);
+
+        // Search again to find it
+        let (result, mut chars) = root.search("abc".chars()).unwrap();
+        assert_eq!(result, Some("Hooray".to_string()));
         assert_eq!(chars.next(), None);
     }
 }
