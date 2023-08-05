@@ -63,7 +63,10 @@ impl TrieNode {
     where
         I: Iterator<Item = char>,
     {
-        let mut top_node = TrieNode::new(keys.next(), None);
+        let Some(first) = keys.next() else{
+            panic!("Tail of TrieNodes cannot be created from an empty sequence");
+        };
+        let mut top_node = TrieNode::new(Some(first), None);
         let mut last_node = &mut top_node;
         for key in keys {
             last_node = { last_node }
@@ -388,5 +391,41 @@ mod test {
 
     #[traced_test]
     #[test]
-    fn test_new_tail() {}
+    #[should_panic]
+    fn test_new_tail_empty() {
+        TrieNode::new_tail("".chars(), "TheEnd".to_string());
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_new_tail_single() {
+        let target_str = "TheStartAndEnd";
+        let node = TrieNode::new_tail("a".chars(), target_str.to_string());
+        assert_eq!(node.key, Some('a'));
+        assert_eq!(node.value, Some(target_str.to_string()));
+
+        assert!(node.children.is_empty());
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_new_tail_multiple() {
+        let target_str = "TheEnd";
+        let node = TrieNode::new_tail("abc".chars(), target_str.to_string());
+        assert_eq!(node.key, Some('a'));
+        assert_eq!(node.value, None);
+
+        let Some(node) = node.children.get(&'b') else{
+            panic!("Expected intermediate node at 'b'");
+        };
+        assert_eq!(node.key, Some('b'));
+        assert_eq!(node.value, None);
+
+        let Some(node) = node.children.get(&'c') else{
+            panic!("Expected leaf node at 'c'");
+        };
+        assert_eq!(node.key, Some('c'));
+        assert_eq!(node.value, Some(target_str.to_string()));
+        assert!(node.children.is_empty());
+    }
 }
