@@ -18,6 +18,16 @@ async fn static_files(path: PathBuf) -> Result<NamedFile, NotFound<String>>{
     }
 }
 
+// From any datapath, try to match and load a file from the directory.
+#[get("/data/<path..>")]
+async fn data(path: PathBuf) -> Result<NamedFile, NotFound<String>> {
+    let path = PathBuf::from("./data/").join(path);
+    match NamedFile::open(path).await {
+        Ok(f) => Ok(f),
+        Err(_) => get_index().await,
+    }
+}
+
 #[get("/")]
 async fn index() -> Result<NamedFile, NotFound<String>>{
     get_index().await
@@ -25,5 +35,5 @@ async fn index() -> Result<NamedFile, NotFound<String>>{
 
 #[launch]
 fn rocket()-> _ {
-    rocket::build().mount("/", routes![index, static_files])
+    rocket::build().mount("/", routes![index, static_files, data])
 }
