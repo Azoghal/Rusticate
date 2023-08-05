@@ -38,11 +38,11 @@ pub struct TrieNode<T: ValToken> {
     key: Option<LzwToken<T>>,
     value: Option<lzw_code::Code>,
     terminator: bool,
-    children: HashMap<LzwToken<T>, RefCell<TrieNode<T>>>,
+    children: HashMap<LzwToken<T>, TrieNode<T>>,
 }
 
 pub struct TrieDictionary<T: ValToken> {
-    root: RefCell<TrieNode<T>>,
+    root: TrieNode<T>,
     // alphabet: Vec<char>,
     clear_code: bool,
     end_code: bool,
@@ -68,10 +68,9 @@ impl<T: ValToken> TrieNode<T> {
     }
 
     pub fn add_child(&mut self, val: LzwToken<T>, sequence_code: lzw_code::Code, terminator: bool) {
-        let inserted = self.children.insert(
-            val,
-            RefCell::new(TrieNode::new(val, sequence_code, terminator)),
-        );
+        let inserted = self
+            .children
+            .insert(val, TrieNode::new(val, sequence_code, terminator));
         match inserted {
             None => {}
             Some(old) => println!("Already had an entry!!! : {:?}", old),
@@ -85,14 +84,9 @@ impl<T: ValToken> TrieDictionary<T> {
         code_gen: &mut lzw_code::CodeGenerator,
         alphabet: Vec<LzwToken<T>>,
     ) -> TrieDictionary<T> {
-        let mut new_trie = TrieDictionary {
-            root: RefCell::new(TrieNode::new_root()),
-            // alphabet,
-            clear_code: lzw_spec.clear_code,
-            end_code: lzw_spec.end_code,
-        };
+        // TODO: Refactor this to build the root node first, and wack it in the
 
-        let mut root = new_trie.root.borrow_mut();
+        let mut root = TrieNode::new_root();
 
         // ADD the alphabet
         for symbol in alphabet.iter() {
@@ -126,21 +120,26 @@ impl<T: ValToken> TrieDictionary<T> {
                 panic!("Base alphabet too large for starting bit width");
             }
         }
-        new_trie
+        TrieDictionary {
+            root,
+            // alphabet,
+            clear_code: lzw_spec.clear_code,
+            end_code: lzw_spec.end_code,
+        }
     }
 
     pub fn run_encrypt<I>(&mut self, token_iter: I, code_gen: &mut lzw_code::CodeGenerator)
     where
         I: Iterator<Item = LzwToken<T>>,
     {
-        let mut current_node = &self.root.borrow_mut();
+        let mut current_node = &mut self.root;
         for token in token_iter {
             // If Token in current node children, jump down
             // If not, remember the current code
             //      add the child, using next code
             //      jump back to root
-            if let Some(child) = current_node.children.get(&token) {
-                let current_node = &child.borrow_mut();
+            if current_node.children.contains_key(&token) {
+                current_node = current_node.children.get_mut(&token).unwrap();
             } else {
                 let code = current_node.value.unwrap();
                 current_node.add_child(token, code_gen.get_next_code().unwrap(), true);
