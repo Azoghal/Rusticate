@@ -1,6 +1,10 @@
 use clap::Parser;
+use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::iter;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -28,14 +32,14 @@ fn main() -> Result<(), TrieError> {
     Ok(())
 }
 
-fn mutable_it_test<I>(mut keys: I)
-where
-    I: Iterator<Item = char>,
-{
-    keys.next();
-}
-
 trait LzwDict {}
+
+#[derive(Copy, Clone, Debug, Hash)]
+enum Token<V: Copy + Clone + Debug + Hash> {
+    End,
+    Clear,
+    Value(V),
+}
 
 #[derive(Debug)]
 enum TrieError {
@@ -45,18 +49,27 @@ enum TrieError {
 }
 
 #[derive(Debug)]
-struct TrieNode {
-    key: Option<char>,
-    value: Option<String>,
-    children: HashMap<char, TrieNode>,
+struct TrieNode<K, V>
+where
+    K: Copy + Hash + Debug + Eq + PartialEq,
+    V: Copy + Debug,
+{
+    key: Option<K>,
+    value: Option<V>,
+    children: HashMap<K, TrieNode<K, V>>,
 }
 
-// TODO:: tests for lzw_insert
 // TODO:: benchmark the two approaches for speed.
 // TODO:: Migrate to generic hashable tokens
+// TODO:: Migrate insert and search to be a trait
+// TODO:: Migrate lzw_insert to be a trait
 
-impl TrieNode {
-    pub fn new(key: Option<char>, value: Option<String>) -> TrieNode {
+impl<K, V> TrieNode<K, V>
+where
+    K: Copy + Hash + Debug + Eq + PartialEq,
+    V: Copy + Debug,
+{
+    pub fn new(key: Option<K>, value: Option<V>) -> TrieNode<K, V> {
         tracing::info!("Creating a new trienode. Key:{:?} Val:{:?}", key, value);
         TrieNode {
             key,
@@ -65,9 +78,9 @@ impl TrieNode {
         }
     }
 
-    pub fn new_tail<I>(mut keys: I, value: String) -> TrieNode
+    pub fn new_tail<I>(mut keys: I, value: V) -> TrieNode<K, V>
     where
-        I: Iterator<Item = char>,
+        I: Iterator<Item = K>,
     {
         let Some(first) = keys.next() else{
             panic!("Tail of TrieNodes cannot be created from an empty sequence");
@@ -84,9 +97,9 @@ impl TrieNode {
         top_node
     }
 
-    pub fn insert<I>(&mut self, mut key_it: I, value: String) -> Result<(), TrieError>
+    pub fn insert<I>(&mut self, mut key_it: I, value: V) -> Result<(), TrieError>
     where
-        I: Iterator<Item = char>,
+        I: Iterator<Item = K>,
     {
         if let Some(key) = key_it.next() {
             let node = self
@@ -97,7 +110,7 @@ impl TrieNode {
         } else {
             match &self.value {
                 Some(val) => {
-                    tracing::info!("Insert sequence exhausted, entry already in trie. Updating value of node\n{} -> {}",val, value);
+                    tracing::info!("Insert sequence exhausted, entry already in trie. Updating value of node\n{:?} -> {:?}",val, value);
                     self.value = Some(value);
                     Ok(())
                 }
@@ -110,16 +123,16 @@ impl TrieNode {
         }
     }
 
-    pub fn search<I>(&self, mut key_it: I) -> Result<Option<String>, TrieError>
+    pub fn search<I>(&self, mut key_it: I) -> Result<Option<V>, TrieError>
     where
-        I: Iterator<Item = char>,
+        I: Iterator<Item = K>,
     {
         if let Some(key) = key_it.next() {
             if let Some(node) = self.children.get(&key) {
                 node.search(key_it)
             } else {
                 tracing::error!(
-                    "Searched for a sequence not present - does the key match? {:?} {}",
+                    "Searched for a sequence not present - does the key match? {:?} {:?}",
                     self.key,
                     key
                 );
@@ -131,7 +144,7 @@ impl TrieNode {
             match &self.value {
                 Some(val) => {
                     // tracing::info!("searched for sequence has value: {}", val);
-                    Ok(Some(val.to_string()))
+                    Ok(Some(*val))
                 }
                 None => {
                     tracing::info!("Searched for sequence has no value");
@@ -141,13 +154,9 @@ impl TrieNode {
         }
     }
 
-    pub fn lzw_insert<I>(
-        &mut self,
-        mut key_it: I,
-        new_val: String,
-    ) -> Result<Option<String>, TrieError>
+    pub fn lzw_insert<I>(&mut self, mut key_it: I, new_val: V) -> Result<Option<V>, TrieError>
     where
-        I: Iterator<Item = char>,
+        I: Iterator<Item = K>,
     {
         // new_val is the code
         // use the iterator to go down the trie
@@ -175,15 +184,17 @@ impl TrieNode {
     }
 }
 
-fn insert_iter<I>(root: &mut TrieNode, mut key_it: I, value: String) -> Result<(), TrieError>
+fn insert_iter<K, V, I>(root: &mut TrieNode<K, V>, mut key_it: I, value: V) -> Result<(), TrieError>
 where
-    I: Iterator<Item = char>,
+    K: Copy + Hash + Debug + Eq + PartialEq,
+    V: Copy + Debug,
+    I: Iterator<Item = K>,
 {
     let mut node = root;
 
     let mut key = key_it.next();
     let Some(mut k) = key else{
-        return Err(TrieError::Insert("Empty character sequence".to_string()))
+        return Err(TrieError::Insert("Empty token sequence".to_string()))
     };
     while node.children.contains_key(&k) {
         node = { node }
@@ -200,7 +211,7 @@ where
     match key {
         None => {
             tracing::info!(
-                "Think we're in the correct node with key {:?}. Updating value {:?} -> {}",
+                "Think we're in the correct node with key {:?}. Updating value {:?} -> {:?}",
                 node.key,
                 node.value,
                 value
@@ -212,18 +223,18 @@ where
                 "Required path not in trie, making tail starting at node with key {:?}",
                 node.key
             );
-            node.children.insert(
-                k,
-                TrieNode::new_tail(k.to_string().chars().chain(key_it), value),
-            );
+            node.children
+                .insert(k, TrieNode::new_tail(iter::once(k).chain(key_it), value));
         }
     }
     Ok(())
 }
 
-fn search_iter<I>(root: &TrieNode, mut key_it: I) -> Result<Option<String>, TrieError>
+fn search_iter<K, V, I>(root: &TrieNode<K, V>, mut key_it: I) -> Result<Option<V>, TrieError>
 where
-    I: Iterator<Item = char>,
+    K: Copy + Hash + Debug + Eq + PartialEq,
+    V: Copy + Debug,
+    I: Iterator<Item = K>,
 {
     // descend
     let mut node = root;
@@ -243,7 +254,7 @@ where
     match key {
         Some(more_k) => {
             tracing::info!(
-                "No such sequence in trie, {} not a child of current node",
+                "No such sequence in trie, {:?} not a child of current node",
                 more_k
             );
             Ok(None)
@@ -255,13 +266,15 @@ where
     }
 }
 
-fn lzw_insert_iter<I>(
-    root: &mut TrieNode,
+fn lzw_insert_iter<K, V, I>(
+    root: &mut TrieNode<K, V>,
     mut key_it: I,
-    value: String,
-) -> Result<Option<String>, TrieError>
+    value: V,
+) -> Result<Option<V>, TrieError>
 where
-    I: Iterator<Item = char>,
+    K: Hash + Copy + Debug + Eq + PartialEq,
+    V: Copy + Debug,
+    I: Iterator<Item = K>,
 {
     // Descend down the nodes until not contained as a child
     // Insert new child, return value
@@ -283,12 +296,12 @@ where
                 return Err(TrieError::Lzw(
                     "Empty character sequence before new node created".to_string(),
                 ))
-            } // Here we know we've reached end - just insert...
+            }
         }
     }
     // Reached a node where the children does not contain k
     node.children.insert(k, TrieNode::new(Some(k), Some(value)));
-    Ok(node.value.clone())
+    Ok(node.value)
 }
 
 #[cfg(test)]
