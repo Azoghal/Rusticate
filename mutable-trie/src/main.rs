@@ -25,32 +25,8 @@ fn main() -> Result<(), TrieError> {
         args.num_nodes
     );
 
-    // make root and populate with lower case dictionary
-    let mut root = TrieNode::new(None, None);
-    for (i, c) in "abcde".chars().enumerate() {
-        root.insert(c.to_string().chars(), i.to_string());
-    }
-    tracing::info!("Root node after alphabet: {:?}", root);
-
-    let key_sequence = "ababc".chars();
-
-    let res = root.lzw_insert(key_sequence, String::from("code1"));
-
-    tracing::info!("Root node after alphabet: {:?}", root);
-
-    match res {
-        Ok(Some(s)) => {
-            tracing::info!("Got a valuable string back! {}", s);
-            Ok(())
-        }
-        Ok(None) => Err(TrieError::Lzw("something went wrong".to_string())),
-        Err(e) => Err(e),
-    }
-
-    // Ok(())
+    Ok(())
 }
-
-// TODO test mutable iterator stuff
 
 fn mutable_it_test<I>(mut keys: I)
 where
@@ -75,8 +51,8 @@ struct TrieNode {
     children: HashMap<char, TrieNode>,
 }
 
+// TODO:: tests for lzw_insert
 // TODO:: benchmark the two approaches for speed.
-// TODO:: Implement the LZW functionality.
 // TODO:: Migrate to generic hashable tokens
 
 impl TrieNode {
@@ -447,6 +423,37 @@ mod test {
             .expect("Error during search")
             .unwrap();
         assert_eq!(searched_val, target_str.to_string());
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_lzw_insert() {
+        // make root and populate with 5 lower case dictionary
+        let mut root = TrieNode::new(None, None);
+        for (i, c) in "abcde".chars().enumerate() {
+            root.insert(c.to_string().chars(), i.to_string());
+        }
+        tracing::info!("Root node after alphabet: {:?}", root);
+
+        let mut key_sequence = "ababc".chars();
+
+        // Insert sequence "ab" and recieve the code for sequence "a"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, String::from("code1")) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, String::from("0"));
+
+        // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, String::from("code2")) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, String::from("code1"));
+
+        // Use search method to find the value in second inserted sequence
+        let Ok(Some(val)) = root.search("abc".chars()) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, String::from("code2"));
     }
 
     #[traced_test]
