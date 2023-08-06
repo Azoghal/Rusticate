@@ -25,8 +25,41 @@ fn main() -> Result<(), TrieError> {
         args.num_nodes
     );
 
-    Ok(())
+    // make root and populate with lower case dictionary
+    let mut root = TrieNode::new(None, None);
+    for (i, c) in "abcde".chars().enumerate() {
+        root.insert(c.to_string().chars(), i.to_string());
+    }
+    tracing::info!("Root node after alphabet: {:?}", root);
+
+    let key_sequence = "ababc".chars();
+
+    let res = root.lzw_insert(key_sequence, String::from("code1"));
+
+    tracing::info!("Root node after alphabet: {:?}", root);
+
+    match res {
+        Ok(Some(s)) => {
+            tracing::info!("Got a valuable string back! {}", s);
+            Ok(())
+        }
+        Ok(None) => Err(TrieError::Lzw("something went wrong".to_string())),
+        Err(e) => Err(e),
+    }
+
+    // Ok(())
 }
+
+// TODO test mutable iterator stuff
+
+fn mutable_it_test<I>(mut keys: I)
+where
+    I: Iterator<Item = char>,
+{
+    keys.next();
+}
+
+trait LzwDict {}
 
 #[derive(Debug)]
 enum TrieError {
@@ -42,10 +75,7 @@ struct TrieNode {
     children: HashMap<char, TrieNode>,
 }
 
-// TODO:: fix the test - proper error handling
 // TODO:: benchmark the two approaches for speed.
-// TODO:: derive and implement display for TrieNode.
-// TODO:: Try the https://stackoverflow.com/questions/29296038/implementing-a-mutable-tree-structure imperative.
 // TODO:: Implement the LZW functionality.
 // TODO:: Migrate to generic hashable tokens
 
@@ -96,8 +126,8 @@ impl TrieNode {
                     Ok(())
                 }
                 None => {
-                    tracing::info!("Inserting new value to trie, {}", value);
                     self.value = Some(value);
+                    tracing::info!("Inserting new value to trie, {:?}", self);
                     Ok(())
                 }
             }
@@ -132,6 +162,36 @@ impl TrieNode {
                     Ok(None)
                 }
             }
+        }
+    }
+
+    pub fn lzw_insert<I>(
+        &mut self,
+        mut key_it: I,
+        new_val: String,
+    ) -> Result<Option<String>, TrieError>
+    where
+        I: Iterator<Item = char>,
+    {
+        // new_val is the code
+        // use the iterator to go down the trie
+        // remembe the last code found
+        // insert a single extra symbol and return the last code
+        if let Some(key) = key_it.next() {
+            if let Some(node) = self.children.get_mut(&key) {
+                // step down the trie into this node and continue consuming tokens
+                let inner_result = node.lzw_insert(key_it, new_val)?;
+                Ok(inner_result)
+            } else {
+                // we are currently in the last node on the iterator path.
+                // create a new node and add to children
+                // return the stored value
+                self.children
+                    .insert(key, TrieNode::new(Some(key), Some(new_val)));
+                Ok(self.value.clone())
+            }
+        } else {
+            Err(TrieError::Lzw("todo".to_string()))
         }
     }
 }
