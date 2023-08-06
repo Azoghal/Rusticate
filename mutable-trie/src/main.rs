@@ -167,7 +167,10 @@ impl TrieNode {
                 Ok(self.value.clone())
             }
         } else {
-            Err(TrieError::Lzw("todo".to_string()))
+            //TODO: this isn't sufficient to cope with a valid end of stream... unless always a certain end token?
+            Err(TrieError::Lzw(
+                "Empty search sequence before new node created".to_string(),
+            ))
         }
     }
 }
@@ -250,6 +253,42 @@ where
             Ok(node.value.clone())
         }
     }
+}
+
+fn lzw_insert_iter<I>(
+    root: &mut TrieNode,
+    mut key_it: I,
+    value: String,
+) -> Result<Option<String>, TrieError>
+where
+    I: Iterator<Item = char>,
+{
+    // Descend down the nodes until not contained as a child
+    // Insert new child, return value
+    let mut node = root;
+
+    let mut key = key_it.next();
+    let Some(mut k) = key else{
+        return Err(TrieError::Lzw("Empty character sequence".to_string()))
+    };
+    while node.children.contains_key(&k) {
+        node = { node }
+            .children
+            .get_mut(&k)
+            .expect("child corresponding to contained key not found.");
+        key = key_it.next();
+        match key {
+            Some(new_k) => k = new_k,
+            None => {
+                return Err(TrieError::Lzw(
+                    "Empty character sequence before new node created".to_string(),
+                ))
+            } // Here we know we've reached end - just insert...
+        }
+    }
+    // Reached a node where the children does not contain k
+    node.children.insert(k, TrieNode::new(Some(k), Some(value)));
+    Ok(node.value.clone())
 }
 
 #[cfg(test)]
@@ -445,6 +484,37 @@ mod test {
 
         // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
         let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, String::from("code2")) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, String::from("code1"));
+
+        // Use search method to find the value in second inserted sequence
+        let Ok(Some(val)) = root.search("abc".chars()) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, String::from("code2"));
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_lzw_insert_iter() {
+        // make root and populate with 5 lower case dictionary
+        let mut root = TrieNode::new(None, None);
+        for (i, c) in "abcde".chars().enumerate() {
+            root.insert(c.to_string().chars(), i.to_string());
+        }
+        tracing::info!("Root node after alphabet: {:?}", root);
+
+        let mut key_sequence = "ababc".chars();
+
+        // Insert sequence "ab" and recieve the code for sequence "a"
+        let Ok(Some(val)) = lzw_insert_iter(&mut root, &mut key_sequence, String::from("code1")) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, String::from("0"));
+
+        // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
+        let Ok(Some(val)) = lzw_insert_iter(&mut root, &mut key_sequence, String::from("code2")) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, String::from("code1"));
