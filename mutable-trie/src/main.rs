@@ -34,7 +34,7 @@ fn main() -> Result<(), TrieError> {
 
 trait LzwDict {}
 
-#[derive(Copy, Clone, Debug, Hash)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 enum Token<V: Copy + Clone + Debug + Hash> {
     End,
     Clear,
@@ -60,7 +60,7 @@ where
 }
 
 // TODO:: benchmark the two approaches for speed.
-// TODO:: Migrate to generic hashable tokens
+// TODO:: Make Test cases with Token
 // TODO:: Migrate insert and search to be a trait
 // TODO:: Migrate lzw_insert to be a trait
 
@@ -475,7 +475,7 @@ mod test {
         // make root and populate with 5 lower case dictionary
         let mut root: TrieNode<char, usize> = TrieNode::new(None, None);
         for (i, c) in "abcde".chars().enumerate() {
-            root.insert(iter::once(c), i);
+            root.insert(iter::once(c), i).unwrap();
         }
         tracing::info!("Root node after alphabet: {:?}", root);
 
@@ -506,7 +506,7 @@ mod test {
         // make root and populate with 5 lower case dictionary
         let mut root = TrieNode::new(None, None);
         for (i, c) in "abcde".chars().enumerate() {
-            root.insert(iter::once(c), i);
+            root.insert(iter::once(c), i).unwrap();
         }
         tracing::info!("Root node after alphabet: {:?}", root);
 
@@ -526,6 +526,50 @@ mod test {
 
         // Use search method to find the value in second inserted sequence
         let Ok(Some(val)) = root.search("abc".chars()) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, 100);
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_token() {
+        let mut root = TrieNode::new(None, None);
+        root.insert(iter::once(Token::Value('a')), 0).unwrap();
+        root.insert(iter::once(Token::Value('b')), 1).unwrap();
+        root.insert(iter::once(Token::Value('c')), 2).unwrap();
+        root.insert(iter::once(Token::Value('d')), 3).unwrap();
+        root.insert(iter::once(Token::Value('e')), 4).unwrap();
+
+        root.insert(iter::once(Token::Clear), 5).unwrap();
+        root.insert(iter::once(Token::End), 6).unwrap();
+        tracing::info!("Root node after alphabet: {:?}", root);
+
+        let mut key_sequence = vec![
+            Token::Value('a'),
+            Token::Value('b'),
+            Token::Value('a'),
+            Token::Value('b'),
+            Token::Value('c'),
+        ]
+        .into_iter();
+
+        // Insert sequence "ab" and recieve the code for sequence "a"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 99) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, 0);
+
+        // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 100) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, 99);
+
+        let final_search_sequence =
+            vec![Token::Value('a'), Token::Value('b'), Token::Value('c')].into_iter();
+        // Use search method to find the value in second inserted sequence
+        let Ok(Some(val)) = root.search(final_search_sequence) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 100);
