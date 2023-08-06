@@ -315,7 +315,7 @@ mod test {
         let mut root = TrieNode::new(None, None);
 
         // Insert what we were looking for
-        root.insert("a".chars(), "Hooray".to_string())
+        root.insert("a".chars(), "Hooray")
             .expect("Error in root.insert");
 
         tracing::debug!("{:?}", root);
@@ -325,10 +325,10 @@ mod test {
                 .entry('a')
                 .or_insert(TrieNode::new(None, None))
                 .value,
-            Some("Hooray".to_string())
+            Some("Hooray")
         );
 
-        root.insert("abc".chars(), "Deeper".to_string())
+        root.insert("abc".chars(), "Deeper")
             .expect("Error during insert");
 
         // First assert that an intermediate node with a key but no value was created
@@ -338,22 +338,19 @@ mod test {
             .or_insert(TrieNode::new(None, None))
             .children
             .entry('b')
-            .or_insert(TrieNode::new(
-                Some('X'),
-                Some("Should't have this".to_string()),
-            ));
+            .or_insert(TrieNode::new(Some('X'), Some("Should't have this")));
 
         assert_eq!(intermediate.key, Some('b'));
         assert_eq!(intermediate.value, None);
 
         // Now assert that the leaf node has the correct key and value
-        let leaf = intermediate.children.entry('c').or_insert(TrieNode::new(
-            Some('X'),
-            Some("Should't have this".to_string()),
-        ));
+        let leaf = intermediate
+            .children
+            .entry('c')
+            .or_insert(TrieNode::new(Some('X'), Some("Should't have this")));
 
         assert_eq!(leaf.key, Some('c'));
-        assert_eq!(leaf.value, Some("Deeper".to_string()));
+        assert_eq!(leaf.value, Some("Deeper"));
     }
 
     #[traced_test]
@@ -362,7 +359,7 @@ mod test {
         let mut root = TrieNode::new(None, None);
         let target_str = "MockValue";
         root.children
-            .insert('a', TrieNode::new(Some('a'), Some(target_str.to_string())));
+            .insert('a', TrieNode::new(Some('a'), Some(target_str)));
 
         tracing::debug!("{:?}", root);
 
@@ -370,13 +367,13 @@ mod test {
             .search("a".chars())
             .expect("Error during search")
             .unwrap();
-        assert_eq!(searched_val, target_str.to_string());
+        assert_eq!(searched_val, target_str);
 
         let target_str = "Deeper";
         let mut intermediate = TrieNode::new(Some('b'), None);
         intermediate
             .children
-            .insert('c', TrieNode::new(Some('c'), Some(target_str.to_string())));
+            .insert('c', TrieNode::new(Some('c'), Some(target_str)));
 
         root.children
             .entry('a')
@@ -391,7 +388,7 @@ mod test {
             .search("abc".chars())
             .expect("Error during search")
             .unwrap();
-        assert_eq!(searched_val, target_str.to_string());
+        assert_eq!(searched_val, target_str);
     }
 
     #[traced_test]
@@ -400,8 +397,7 @@ mod test {
         let mut root = TrieNode::new(None, None);
 
         // Insert what we were looking for
-        insert_iter(&mut root, "a".chars(), "Hooray".to_string())
-            .expect("Error during insert_iter");
+        insert_iter(&mut root, "a".chars(), "Hooray").expect("Error during insert_iter");
 
         tracing::debug!("{:?}", root);
 
@@ -410,11 +406,10 @@ mod test {
                 .entry('a')
                 .or_insert(TrieNode::new(None, None))
                 .value,
-            Some("Hooray".to_string())
+            Some("Hooray")
         );
 
-        insert_iter(&mut root, "abc".chars(), "Deeper".to_string())
-            .expect("Error during insert iter");
+        insert_iter(&mut root, "abc".chars(), "Deeper").expect("Error during insert iter");
 
         // First assert that an intermediate node with a key but no value was created
         let intermediate = root
@@ -423,22 +418,19 @@ mod test {
             .or_insert(TrieNode::new(None, None))
             .children
             .entry('b')
-            .or_insert(TrieNode::new(
-                Some('X'),
-                Some("Should't have this".to_string()),
-            ));
+            .or_insert(TrieNode::new(Some('X'), Some("Should't have this")));
 
         assert_eq!(intermediate.key, Some('b'));
         assert_eq!(intermediate.value, None);
 
         // Now assert that the leaf node has the correct key and value
-        let leaf = intermediate.children.entry('c').or_insert(TrieNode::new(
-            Some('X'),
-            Some("Should't have this".to_string()),
-        ));
+        let leaf = intermediate
+            .children
+            .entry('c')
+            .or_insert(TrieNode::new(Some('X'), Some("Should't have this")));
 
         assert_eq!(leaf.key, Some('c'));
-        assert_eq!(leaf.value, Some("Deeper".to_string()));
+        assert_eq!(leaf.value, Some("Deeper"));
     }
 
     #[traced_test]
@@ -447,20 +439,20 @@ mod test {
         let mut root = TrieNode::new(None, None);
         let target_str = "MockValue";
         root.children
-            .insert('a', TrieNode::new(Some('a'), Some(target_str.to_string())));
+            .insert('a', TrieNode::new(Some('a'), Some(target_str)));
 
         tracing::debug!("{:?}", root);
 
         let searched_val = search_iter(&root, "a".chars())
             .expect("Error during search")
             .unwrap();
-        assert_eq!(searched_val, target_str.to_string());
+        assert_eq!(searched_val, target_str);
 
         let target_str = "Deeper";
         let mut intermediate = TrieNode::new(Some('b'), None);
         intermediate
             .children
-            .insert('c', TrieNode::new(Some('c'), Some(target_str.to_string())));
+            .insert('c', TrieNode::new(Some('c'), Some(target_str)));
 
         root.children
             .entry('a')
@@ -474,38 +466,38 @@ mod test {
         let searched_val = search_iter(&root, "abc".chars())
             .expect("Error during search")
             .unwrap();
-        assert_eq!(searched_val, target_str.to_string());
+        assert_eq!(searched_val, target_str);
     }
 
     #[traced_test]
     #[test]
     fn test_lzw_insert() {
         // make root and populate with 5 lower case dictionary
-        let mut root = TrieNode::new(None, None);
+        let mut root: TrieNode<char, usize> = TrieNode::new(None, None);
         for (i, c) in "abcde".chars().enumerate() {
-            root.insert(c.to_string().chars(), i.to_string());
+            root.insert(iter::once(c), i);
         }
         tracing::info!("Root node after alphabet: {:?}", root);
 
         let mut key_sequence = "ababc".chars();
 
         // Insert sequence "ab" and recieve the code for sequence "a"
-        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, String::from("code1")) else{
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 99) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, String::from("0"));
+        assert_eq!(val, 0);
 
         // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
-        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, String::from("code2")) else{
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 100) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, String::from("code1"));
+        assert_eq!(val, 99);
 
         // Use search method to find the value in second inserted sequence
         let Ok(Some(val)) = root.search("abc".chars()) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, String::from("code2"));
+        assert_eq!(val, 100);
     }
 
     #[traced_test]
@@ -514,45 +506,45 @@ mod test {
         // make root and populate with 5 lower case dictionary
         let mut root = TrieNode::new(None, None);
         for (i, c) in "abcde".chars().enumerate() {
-            root.insert(c.to_string().chars(), i.to_string());
+            root.insert(iter::once(c), i);
         }
         tracing::info!("Root node after alphabet: {:?}", root);
 
         let mut key_sequence = "ababc".chars();
 
         // Insert sequence "ab" and recieve the code for sequence "a"
-        let Ok(Some(val)) = lzw_insert_iter(&mut root, &mut key_sequence, String::from("code1")) else{
+        let Ok(Some(val)) = lzw_insert_iter(&mut root, &mut key_sequence, 99) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, String::from("0"));
+        assert_eq!(val, 0);
 
         // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
-        let Ok(Some(val)) = lzw_insert_iter(&mut root, &mut key_sequence, String::from("code2")) else{
+        let Ok(Some(val)) = lzw_insert_iter(&mut root, &mut key_sequence, 100) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, String::from("code1"));
+        assert_eq!(val, 99);
 
         // Use search method to find the value in second inserted sequence
         let Ok(Some(val)) = root.search("abc".chars()) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, String::from("code2"));
+        assert_eq!(val, 100);
     }
 
     #[traced_test]
     #[test]
     #[should_panic]
     fn test_new_tail_empty() {
-        TrieNode::new_tail("".chars(), "TheEnd".to_string());
+        TrieNode::new_tail("".chars(), "TheEnd");
     }
 
     #[traced_test]
     #[test]
     fn test_new_tail_single() {
         let target_str = "TheStartAndEnd";
-        let node = TrieNode::new_tail("a".chars(), target_str.to_string());
+        let node = TrieNode::new_tail("a".chars(), target_str);
         assert_eq!(node.key, Some('a'));
-        assert_eq!(node.value, Some(target_str.to_string()));
+        assert_eq!(node.value, Some(target_str));
 
         assert!(node.children.is_empty());
     }
@@ -561,7 +553,7 @@ mod test {
     #[test]
     fn test_new_tail_multiple() {
         let target_str = "TheEnd";
-        let node = TrieNode::new_tail("abc".chars(), target_str.to_string());
+        let node = TrieNode::new_tail("abc".chars(), target_str);
         assert_eq!(node.key, Some('a'));
         assert_eq!(node.value, None);
 
@@ -575,7 +567,7 @@ mod test {
             panic!("Expected leaf node at 'c'");
         };
         assert_eq!(node.key, Some('c'));
-        assert_eq!(node.value, Some(target_str.to_string()));
+        assert_eq!(node.value, Some(target_str));
         assert!(node.children.is_empty());
     }
 }
