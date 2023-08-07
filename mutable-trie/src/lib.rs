@@ -1,4 +1,3 @@
-use clap::Parser;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::env;
@@ -8,39 +7,19 @@ use std::iter;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-#[derive(Parser)]
-#[command(author, version, about, long_about=None)]
-// #[command(propagate_version = true)]
-struct Args {
-    #[arg(default_value_t = 10)]
-    num_nodes: u8,
-}
-
-fn main() -> Result<(), TrieError> {
-    env::set_var("RUST_BACKTRACE", "1");
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-
-    let args = Args::parse();
-
-    Ok(())
-}
-
 pub trait TrieKey: Copy + Hash + Debug + Eq + PartialEq {}
 impl<T: Copy + Hash + Debug + Eq + PartialEq> TrieKey for T {}
 
 pub trait TrieVal: Copy + Debug {}
 impl<T: Copy + Debug> TrieVal for T {}
 
-trait Trie<K, V> {
+pub trait Trie<K, V> {
     fn insert<I: Iterator<Item = K>>(&mut self, key_it: I, value: V) -> Result<(), TrieError>;
 
     fn search<I: Iterator<Item = K>>(&self, key_it: I) -> Result<Option<V>, TrieError>;
 }
 
-trait IterTrie<T, K, V> {
+pub trait IterTrie<T, K, V> {
     fn insert_iter<I: Iterator<Item = K>>(
         root: &mut T,
         key_it: I,
@@ -50,7 +29,7 @@ trait IterTrie<T, K, V> {
     fn search_iter<I: Iterator<Item = K>>(root: &T, key_it: I) -> Result<Option<V>, TrieError>;
 }
 
-trait LzwDict<K, V> {
+pub trait LzwDict<K, V> {
     fn lzw_insert<I: Iterator<Item = K>>(
         &mut self,
         key_it: I,
@@ -58,7 +37,7 @@ trait LzwDict<K, V> {
     ) -> Result<Option<V>, TrieError>;
 }
 
-trait IterLzwDict<T, K, V> {
+pub trait IterLzwDict<T, K, V> {
     fn lzw_insert_iter<I: Iterator<Item = K>>(
         root: &mut T,
         key_it: I,
@@ -67,21 +46,21 @@ trait IterLzwDict<T, K, V> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
-enum Token<V: TrieKey> {
+pub enum Token<V: TrieKey> {
     End,
     Clear,
     Value(V),
 }
 
 #[derive(Debug)]
-enum TrieError {
+pub enum TrieError {
     Search(String),
     Insert(String),
     Lzw(String),
 }
 
 #[derive(Debug)]
-struct TrieNode<K, V>
+pub struct TrieNode<K, V>
 where
     K: TrieKey,
     V: TrieVal,
@@ -90,8 +69,6 @@ where
     value: Option<V>,
     children: HashMap<K, TrieNode<K, V>>,
 }
-
-// TODO:: benchmark the two approaches for speed.
 
 impl<K, V> TrieNode<K, V>
 where
@@ -166,11 +143,7 @@ where
             if let Some(node) = self.children.get(&key) {
                 node.search(key_it)
             } else {
-                tracing::error!(
-                    "Searched for a sequence not present - does the key match? {:?} {:?}",
-                    self.key,
-                    key
-                );
+                tracing::error!("Searched for a sequence not present");
                 Err(TrieError::Search(
                     "Searched for sequence not present".to_string(),
                 ))
@@ -268,7 +241,7 @@ where
             }
             None => {
                 tracing::info!("found the value");
-                Ok(node.value.clone())
+                Ok(node.value)
             }
         }
     }
@@ -298,7 +271,7 @@ where
                 // return the stored value
                 self.children
                     .insert(key, TrieNode::new(Some(key), Some(new_val)));
-                Ok(self.value.clone())
+                Ok(self.value)
             }
         } else {
             //TODO: this isn't sufficient to cope with a valid end of stream... unless always a certain end token?

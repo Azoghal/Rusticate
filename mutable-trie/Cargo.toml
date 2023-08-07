@@ -1,12 +1,26 @@
 [package]
-name = "mutable-trie"
+name = "mutable_trie"
 version = "0.1.0"
 edition = "2021"
+
+[lib]
+name = "mutable_trie"
+path = "src/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = {version="4.3.19" , features = ["derive"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.17"
 tracing-test = "0.2.4"
+
+[dev-dependencies]
+criterion = { version = "0.4", features = ["html_reports"] }
+
+[[bench]]
+name = "lzw_trie_benchmark"
+harness = false
+
+[[bench]]
+name = "trie_benchmark"
+harness = false
