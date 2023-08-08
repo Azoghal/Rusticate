@@ -1,11 +1,9 @@
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
-use std::env;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::iter;
 use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
 
 pub trait TrieKey: Copy + Hash + Debug + Eq + PartialEq {}
 impl<T: Copy + Hash + Debug + Eq + PartialEq> TrieKey for T {}
@@ -17,6 +15,16 @@ pub trait Trie<K, V> {
     fn insert<I: Iterator<Item = K>>(&mut self, key_it: I, value: V) -> Result<(), TrieError>;
 
     fn search<I: Iterator<Item = K>>(&self, key_it: I) -> Result<Option<V>, TrieError>;
+
+    fn populate_initial<I: Iterator<Item = (K, V)>>(
+        &mut self,
+        kv_pair_it: I,
+    ) -> Result<(), TrieError> {
+        for (k, v) in kv_pair_it {
+            self.insert(iter::once(k), v)?;
+        }
+        Ok(())
+    }
 }
 
 pub trait IterTrie<T, K, V> {
@@ -324,6 +332,8 @@ where
     }
 }
 
+// TODO: fix the lzw tests so that they correctly leave the mutable iterator with the unconsumed (inspected and replaced). Possible with Peakable
+
 #[cfg(test)]
 mod test {
     use tracing_test::traced_test;
@@ -594,6 +604,41 @@ mod test {
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 100);
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_benchmark_setup() {
+        let to_insert = String::from("tobeornottobeortobeornot");
+        let mut root: TrieNode<char, i32> = TrieNode::new(None, None);
+
+        let alphabet = "abcdefghijklmnopqrstuvwxyz".chars();
+        let codes = 0..26;
+        let alpha_codes = alphabet.zip(codes);
+
+        root.populate_initial(alpha_codes);
+        let mut char_iter = to_insert.chars();
+        let mut codes = 26..40;
+        while let Ok(op) = root.lzw_insert(&mut char_iter, codes.next().unwrap()) {}
+        assert!(codes.is_empty());
+        let thirty_eight = root.search("tobe".chars()).unwrap().unwrap();
+        assert_eq!(thirty_eight, 38);
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_populate_initial() {
+        let alphabet = "abcdefghijklmnopqrstuvwxyz".chars();
+        let codes = 0..26;
+        let alpha_codes = alphabet.zip(codes);
+        let mut root: TrieNode<char, i32> = TrieNode::new(None, None);
+        root.populate_initial(alpha_codes).unwrap();
+
+        let a = root.children.get(&'a').unwrap().value;
+        assert_eq!(a, Some(0));
+
+        let z = root.children.get(&'z').unwrap().value;
+        assert_eq!(z, Some(25));
     }
 
     #[traced_test]
