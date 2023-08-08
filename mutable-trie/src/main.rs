@@ -16,6 +16,7 @@ fn make_peekable_and_ret<I>(mut the_it: I)
 where
     I: Iterator<Item = char>,
 {
+    // DOESN't work
     println!("Going to next, then peek, then exit");
     println!("Next: {:?}", the_it.next());
     println!("Peeking at the thing. 👀{:?}", the_it.peekable().peek());
@@ -25,6 +26,7 @@ fn take_peekable_and_ret<I>(the_peekable: &mut Peekable<I>)
 where
     I: Iterator<Item = char>,
 {
+    // DOESN't work
     println!("Going to next, then peek, then exit");
     println!("Next: {:?}", the_peekable.next());
     println!(
@@ -44,6 +46,32 @@ where
     iter::once(popped).chain(the_it)
 }
 
+fn increment(a: u16) -> u16 {
+    a + 1
+}
+
+fn take_3_with_inspect_wrapper_2(mut the_iter: Box<dyn Iterator<Item = char>>) {
+    let popped = take_3_ret_1(&mut the_iter);
+    the_iter = Box::new(iter::once(popped).chain(the_iter));
+}
+
+fn take_3_with_inspect_wrapper<'a>(
+    the_iter: &'a mut Box<dyn Iterator<Item = char>>,
+) -> Box<dyn Iterator<Item = char> + 'a> {
+    let popped = take_3_ret_1(the_iter);
+    Box::new(iter::once(popped).chain(the_iter))
+}
+
+fn take_3_ret_1(iter: &mut Box<dyn Iterator<Item = char>>) -> char {
+    iter.next().unwrap();
+    iter.next().unwrap();
+    let val = iter.next().unwrap();
+    val
+}
+
+// TODO: try some stuff with IterTools
+// TODO: try with PeekingNext from IterTOols
+
 fn main() {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
@@ -52,18 +80,13 @@ fn main() {
 
     let _args = Args::parse();
 
-    info!("Going to make an iterator, pass it as mutable to a function, which is going to make it peekable, next, peek, and then exit");
-    let mut char_iter = "abcde".chars();
-    make_peekable_and_ret(&mut char_iter);
-    println!("What happens when i get back? Next: {:?}", char_iter.next());
-
-    info!("Going to make a peekable iterator, pass it as mutable to a function, which is going to next, peek, and then exit");
-    let mut char_iter = "abcde".chars().peekable();
-    take_peekable_and_ret(&mut char_iter);
-    println!("What happens when i get back? Next: {:?}", char_iter.next());
-
     info!("Going to make an iterator, pass it as mutable to a function, which is going to next, re-attach it and return it");
-    let mut char_iter = "abcde".chars();
-    let mut new_iter = take_it_and_ret_it(&mut char_iter);
-    println!("What happens when i get back? Next: {:?}", new_iter.next());
+
+    let mut char_iter: Box<dyn Iterator<Item = char>> = Box::new("abcdefgh".chars());
+
+    for c in take_3_with_inspect_wrapper(&mut char_iter) {
+        println!("{c}");
+    }
+
+    char_iter.next();
 }
