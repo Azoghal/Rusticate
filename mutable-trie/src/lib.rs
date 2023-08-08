@@ -267,7 +267,7 @@ where
         // new_val is the code
         // use the iterator to go down the trie
         // remembe the last code found
-        // insert a single extra symbol and return the last code
+        // insert a single extra symbol and return the last
         if let Some(key) = key_it.next() {
             if let Some(node) = self.children.get_mut(&key) {
                 // step down the trie into this node and continue consuming tokens
@@ -276,6 +276,7 @@ where
             } else {
                 // we are currently in the last node on the iterator path.
                 // create a new node and add to children
+                // put the key back in the iterator as it needs to be consumed
                 // return the stored value
                 self.children
                     .insert(key, TrieNode::new(Some(key), Some(new_val)));
