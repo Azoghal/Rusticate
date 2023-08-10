@@ -40,7 +40,7 @@ pub trait IterTrie<T, K, V> {
 pub trait LzwDict<K, V> {
     fn lzw_insert<I: Iterator<Item = K>>(
         &mut self,
-        key_it: I,
+        key_it: &mut Peekable<I>,
         new_val: V,
     ) -> Result<Option<V>, TrieError>;
 }
@@ -84,7 +84,7 @@ where
     V: TrieVal,
 {
     pub fn new(key: Option<K>, value: Option<V>) -> TrieNode<K, V> {
-        tracing::info!("Creating a new trienode. Key:{:?} Val:{:?}", key, value);
+        //tracing::info!("Creating a new trienode. Key:{:?} Val:{:?}", key, value);
         TrieNode {
             key,
             value,
@@ -260,30 +260,36 @@ where
     K: TrieKey,
     V: TrieVal,
 {
-    fn lzw_insert<I>(&mut self, mut key_it: I, new_val: V) -> Result<Option<V>, TrieError>
+    fn lzw_insert<I>(
+        &mut self,
+        key_it: &mut Peekable<I>,
+        new_val: V,
+    ) -> Result<Option<V>, TrieError>
     where
         I: Iterator<Item = K>,
     {
-        // new_val is the code
-        // use the iterator to go down the trie
-        // remembe the last code found
-        // insert a single extra symbol and return the last
-        if let Some(key) = key_it.next() {
-            if let Some(node) = self.children.get_mut(&key) {
+        // Peek at the next item
+        if let Some(key) = key_it.peek() {
+            if let Some(node) = self.children.get_mut(key) {
                 // step down the trie into this node and continue consuming tokens
+                key_it.next(); // advance iterator
                 let inner_result = node.lzw_insert(key_it, new_val)?;
                 Ok(inner_result)
             } else {
-                // we are currently in the last node on the iterator path.
+                // we are currently in the last node on the iterator's path through the trie
                 // create a new node and add to children
-                // put the key back in the iterator as it needs to be consumed
+                // DO NOT advance the iterator, as next call needs to start at this key
                 // return the stored value
                 self.children
-                    .insert(key, TrieNode::new(Some(key), Some(new_val)));
+                    .insert(*key, TrieNode::new(Some(*key), Some(new_val)));
                 Ok(self.value)
             }
         } else {
             //TODO: this isn't sufficient to cope with a valid end of stream... unless always a certain end token?
+            info!(
+                "Escaping lzw_insert due to end of sequence, trying to add code {:?}",
+                new_val
+            );
             Err(TrieError::Lzw(
                 "Empty search sequence before new node created".to_string(),
             ))
@@ -323,7 +329,7 @@ where
                 return Ok(node.value);
             }
         }
-        // TODO return code.
+        // TODO return the code without adding new sequence
         Err(TrieError::Lzw("Reached end of sequence".to_string()))
     }
 }
@@ -506,7 +512,7 @@ mod test {
         }
         tracing::info!("Root node after alphabet: {:?}", root);
 
-        let mut key_sequence = "ababc".chars();
+        let mut key_sequence = "ababc".chars().peekable();
 
         // Insert sequence "ab" and recieve the code for sequence "a"
         let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 99) else{
@@ -609,13 +615,20 @@ mod test {
             Token::Value('b'),
             Token::Value('c'),
         ]
-        .into_iter();
+        .into_iter()
+        .peekable();
 
         // Insert sequence "ab" and recieve the code for sequence "a"
         let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 99) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 0);
+
+        // Insert sequence "ba" and recieve the code for sequence "b"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 100) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, 1);
 
         // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
         let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 100) else{
@@ -643,12 +656,30 @@ mod test {
             .map(|(u, c)| (c, u as i32));
 
         root.populate_initial(alpha_codes);
-        let mut char_iter = to_insert.chars();
-        let mut codes = 26..40;
-        while let Ok(op) = root.lzw_insert(&mut char_iter, codes.next().unwrap()) {}
-        assert!(codes.is_empty());
-        let thirty_eight = root.search("tobe".chars()).unwrap().unwrap();
-        assert_eq!(thirty_eight, 38);
+        let mut char_iter = to_insert.chars().peekable();
+        let mut codes = 26..;
+        while let Ok(Some(_v)) = root.lzw_insert(&mut char_iter, codes.next().unwrap()) {}
+
+        let Some(next_code) = codes.next() else{
+            panic!("out of codes");
+        };
+        // 0-40 used, 41 passed to lzw_insert but not used, so next should be 42
+        assert_eq!(next_code, 42);
+
+        let trie_paths = (vec![
+            "be", "beo", "eo", "eor", "no", "ob", "or", "ort", "ot", "rn", "rno", "to", "tob",
+            "tobe", "tt",
+        ])
+        .into_iter();
+        let trie_vals =
+            (vec![28, 36, 29, 39, 32, 27, 30, 37, 33, 31, 40, 26, 35, 38, 34]).into_iter();
+        assert_eq!(trie_paths.len(), trie_vals.len());
+        let path_vals = trie_paths.zip(trie_vals);
+
+        for (path, exp_val) in path_vals {
+            let found_val = root.search(path.chars()).unwrap().unwrap();
+            assert_eq!(found_val, exp_val);
+        }
     }
 
     #[traced_test]
