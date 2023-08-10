@@ -2,7 +2,7 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::iter;
+use std::iter::{self, Peekable};
 use tracing::{info, Level};
 
 pub trait TrieKey: Copy + Hash + Debug + Eq + PartialEq {}
@@ -48,7 +48,7 @@ pub trait LzwDict<K, V> {
 pub trait IterLzwDict<T, K, V> {
     fn lzw_insert_iter<I: Iterator<Item = K>>(
         root: &mut T,
-        key_it: I,
+        key_it: &mut Peekable<I>,
         value: V,
     ) -> Result<Option<V>, TrieError>;
 }
@@ -298,7 +298,7 @@ where
 {
     fn lzw_insert_iter<I>(
         root: &mut TrieNode<K, V>,
-        mut key_it: I,
+        key_it: &mut Peekable<I>,
         value: V,
     ) -> Result<Option<V>, TrieError>
     where
@@ -308,32 +308,27 @@ where
         // Insert new child, return value
         let mut node = root;
 
-        let mut key = key_it.next();
-        let Some(mut k) = key else{
-            return Err(TrieError::Lzw("Empty character sequence".to_string()))
-        };
-        while node.children.contains_key(&k) {
-            node = { node }
-                .children
-                .get_mut(&k)
-                .expect("child corresponding to contained key not found.");
-            key = key_it.next();
-            match key {
-                Some(new_k) => k = new_k,
-                None => {
-                    return Err(TrieError::Lzw(
-                        "Empty character sequence before new node created".to_string(),
-                    ))
-                }
+        while let Some(k) = key_it.peek() {
+            if node.children.contains_key(k) {
+                //let _ = key_it.next(); // Advance the iterator after peeking at a contained key
+                node = { node }
+                    .children
+                    .get_mut(k)
+                    .expect("child corresponding to contained key not found.");
+                key_it.next(); // advance the iterator
+            } else {
+                // Reached a node where the children does not contain k
+                node.children
+                    .insert(*k, TrieNode::new(Some(*k), Some(value)));
+                return Ok(node.value);
             }
         }
-        // Reached a node where the children does not contain k
-        node.children.insert(k, TrieNode::new(Some(k), Some(value)));
-        Ok(node.value)
+        // TODO return code.
+        Err(TrieError::Lzw("Reached end of sequence".to_string()))
     }
 }
 
-// TODO: fix the lzw tests so that they correctly leave the mutable iterator with the unconsumed (inspected and replaced). Possible with Peakable
+// TODO: refactor lzw methods to use Peekable and therefore leave iterator in correct state.
 
 #[cfg(test)]
 mod test {
@@ -560,7 +555,7 @@ mod test {
         }
         tracing::info!("Root node after alphabet: {:?}", root);
 
-        let mut key_sequence = "ababc".chars();
+        let mut key_sequence = "ababc".chars().peekable();
 
         // Insert sequence "ab" and recieve the code for sequence "a"
         let Ok(Some(val)) = TrieNode::lzw_insert_iter(&mut root, &mut key_sequence, 99) else{

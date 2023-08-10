@@ -25,7 +25,7 @@ fn iter_lzw_trie(to_insert: String) {
     let mut root: TrieNode<char, i32> = TrieNode::new(None, None);
     root.populate_initial(alpha_codes).unwrap();
 
-    let mut char_iter = to_insert.chars();
+    let mut char_iter = to_insert.chars().peekable();
     // we need to make insert calls while char_iter is not empty
     let mut code = 26;
     while let Ok(Some(_)) = TrieNode::lzw_insert_iter(&mut root, &mut char_iter, code) {
