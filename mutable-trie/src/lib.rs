@@ -519,17 +519,35 @@ mod test {
         };
         assert_eq!(val, 0);
 
-        // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
+        // Insert the sequence "ba" and recieve the code for sequence "b"
         let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 100) else{
             panic!("expected to recieve a value from lzw_insert");
         };
+        assert_eq!(val, 1);
+
+        // Insert the sequence "abc" and recieve the code for sequence "ab"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 101) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
         assert_eq!(val, 99);
+
+        // Assert that the iterator still contains "c" - ready for the next insert
+        let Some(c) = key_sequence.next() else{
+            panic!();
+        };
+        assert_eq!(c, 'c');
+
+        // Use search method to find the value in second inserted sequence
+        let Ok(Some(val)) = root.search("ba".chars()) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
+        assert_eq!(val, 100);
 
         // Use search method to find the value in second inserted sequence
         let Ok(Some(val)) = root.search("abc".chars()) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, 100);
+        assert_eq!(val, 101);
     }
 
     #[traced_test]
@@ -550,17 +568,29 @@ mod test {
         };
         assert_eq!(val, 0);
 
-        // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
+        // Insert sequence "ba" and recieve the code for sequence "b"
         let Ok(Some(val)) = TrieNode::lzw_insert_iter(&mut root, &mut key_sequence, 100) else{
             panic!("expected to recieve a value from lzw_insert");
         };
+        assert_eq!(val, 1);
+
+        // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
+        let Ok(Some(val)) = TrieNode::lzw_insert_iter(&mut root, &mut key_sequence, 101) else{
+            panic!("expected to recieve a value from lzw_insert");
+        };
         assert_eq!(val, 99);
+
+        // Assert that the iterator still contains "c" - ready for the next insert
+        let Some(c) = key_sequence.next() else{
+            panic!();
+        };
+        assert_eq!(c, 'c');
 
         // Use search method to find the value in second inserted sequence
         let Ok(Some(val)) = root.search("abc".chars()) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, 100);
+        assert_eq!(val, 101);
     }
 
     #[traced_test]
@@ -609,13 +639,13 @@ mod test {
 
     #[traced_test]
     #[test]
-    fn test_benchmark_setup() {
+    fn test_wikipedia_input() {
         let to_insert = String::from("tobeornottobeortobeornot");
         let mut root: TrieNode<char, i32> = TrieNode::new(None, None);
 
-        let alphabet = "abcdefghijklmnopqrstuvwxyz".chars();
-        let codes = 0..26;
-        let alpha_codes = alphabet.zip(codes);
+        let alpha_codes = "abcdefghijklmnopqrstuvwxyz"
+            .char_indices()
+            .map(|(u, c)| (c, u as i32));
 
         root.populate_initial(alpha_codes);
         let mut char_iter = to_insert.chars();
