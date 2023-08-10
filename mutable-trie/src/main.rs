@@ -1,7 +1,11 @@
+use std::{
+    collections::HashMap,
+    iter::{self, Peekable},
+};
+
 use clap::Parser;
-use std::collections::HashMap;
-use std::env;
-use tracing::{info, Level};
+use itertools::{Itertools, PeekingNext, TupleWindows};
+use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser)]
@@ -9,423 +13,150 @@ use tracing_subscriber::FmtSubscriber;
 // #[command(propagate_version = true)]
 struct Args {
     #[arg(default_value_t = 10)]
-    num_nodes: u8,
+    arg_num: u8,
 }
 
-fn main() -> Result<(), TrieError> {
-    env::set_var("RUST_BACKTRACE", "1");
+fn make_peekable_and_ret<I>(mut the_it: I)
+where
+    I: Iterator<Item = char>,
+{
+    // DOESN't work
+    println!("Going to next, then peek, then exit");
+    println!("Next: {:?}", the_it.next());
+    println!("Peeking at the thing. 👀{:?}", the_it.peekable().peek());
+}
+
+fn take_peekable_and_ret<I>(the_peekable: &mut Peekable<I>)
+where
+    I: Iterator<Item = char>,
+{
+    // DOESN't work
+    println!("Going to next, then peek, then exit");
+    println!("Next: {:?}", the_peekable.next());
+    println!("Peeking at the thing. 👀{:?}", the_peekable.peek());
+    println!("Next: {:?}", the_peekable.next());
+    println!("Peeking at the thing. 👀{:?}", the_peekable.peek());
+}
+
+fn take_it_and_ret_it<'a, I>(the_it: &'a mut I) -> impl Iterator<Item = char> + 'a
+where
+    I: Iterator<Item = char> + 'a,
+{
+    println!("Going to next, then peek, then exit");
+    let popped = the_it.next().unwrap();
+    println!("Next was {}", popped);
+    iter::once(popped).chain(the_it)
+}
+
+fn increment(a: u16) -> u16 {
+    a + 1
+}
+
+// fn take_3_with_inspect_wrapper_2(mut the_iter: &Box<dyn Iterator<Item = char>>) {
+//     let popped = take_3_ret_1(&mut the_iter);
+//     let temp = Box::new(iter::once(popped).chain(the_iter));
+// }
+
+fn take_3_with_inspect_wrapper<'a>(
+    the_iter: &'a mut Box<dyn Iterator<Item = char>>,
+) -> Box<dyn Iterator<Item = char> + 'a> {
+    let popped = take_3_ret_1(the_iter);
+    Box::new(iter::once(popped).chain(the_iter))
+}
+
+fn take_3_ret_1(iter: &mut Box<dyn Iterator<Item = char>>) -> char {
+    iter.next().unwrap();
+    iter.next().unwrap();
+    let val = iter.next().unwrap();
+    val
+}
+
+// TODO: try some stuff with IterTools
+// TODO: try with PeekingNext from IterTOols
+
+fn with_tuple_windows<I>(it: &mut I)
+where
+    I: Iterator<Item = char>,
+{
+    let mut tupledude = it.tuple_windows::<(char, char)>();
+    // for (a, b) in tupledude {
+    //     println!("{a} {b}");
+    // }
+    if let Some((a, b)) = tupledude.next() {
+        println!("{a}, {b}");
+    };
+}
+
+// fn with_peeking_next<I>(it: &mut Peekable<I>)
+// where
+//     I: Iterator<Item = char>,
+// {
+//     let candidates: Vec<char> = vec!['a', 'b', 'c'];
+//     //let mut peekingdude = it.peeking_next(|c| candidates.contains(c));
+//     // for (a, b) in tupledude {
+//     //     println!("{a} {b}");
+//     // }
+//     while let Some(a) = it.peeking_next(|c| candidates.contains(c)) {
+//         println!("{a}");
+//     }
+// }
+
+fn take_if_in_map<I>(map: HashMap<char, i32>, it: &mut Peekable<I>)
+where
+    I: Iterator<Item = char>,
+{
+    let op = it.peek();
+    match op {
+        Some(c) => {
+            println!("{:?} ", c);
+            if map.contains_key(c) {
+                println!(
+                    "Jump Down a node, using next to move cursor on: {:?}",
+                    it.next()
+                );
+            } else {
+                println!("make a new node!")
+            }
+        }
+        None => println!("Empty!!!"),
+    }
+}
+
+fn main() {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    let args = Args::parse();
-    info!(
-        "Starting to make a trie with the following number of nodes: {}",
-        args.num_nodes
-    );
+    let _args = Args::parse();
 
-    Ok(())
-}
+    // let mut char_iter: Box<dyn Iterator<Item = char>> = Box::new("abcdefgh".chars());
 
-#[derive(Debug)]
-enum TrieError {
-    Search(String),
-    Insert(String),
-    Lzw(String),
-}
+    // for c in take_3_with_inspect_wrapper(&mut char_iter) {
+    //     println!("{c}");
+    // }
 
-#[derive(Debug)]
-struct TrieNode {
-    key: Option<char>,
-    value: Option<String>,
-    children: HashMap<char, TrieNode>,
-}
+    // let mut map: HashMap<char, i32> = HashMap::new();
+    // map.insert('a', 1);
 
-// TODO:: fix the test - proper error handling
-// TODO:: benchmark the two approaches for speed.
-// TODO:: derive and implement display for TrieNode.
-// TODO:: Try the https://stackoverflow.com/questions/29296038/implementing-a-mutable-tree-structure imperative.
-// TODO:: Implement the LZW functionality.
-// TODO:: Migrate to generic hashable tokens
+    // let mut char_iter = "abcdefghi".chars();
 
-impl TrieNode {
-    pub fn new(key: Option<char>, value: Option<String>) -> TrieNode {
-        tracing::info!("Creating a new trienode. Key:{:?} Val:{:?}", key, value);
-        TrieNode {
-            key,
-            value,
-            children: HashMap::new(),
-        }
-    }
+    // while let Some(key) = char_iter.peeking_next(|c| map.contains_key(c)) {
+    //     println!("{:?} : {:?}", key, map.get(&key));
+    // }
+    // println!("after: {:?}", char_iter.next());
+    // let mut peekable_chars = "abcdefghi".chars().peekable();
+    // take_peekable_and_ret(&mut peekable_chars);
+    // println!("Nexting outside of function {:?}", peekable_chars.next());
 
-    pub fn new_tail<I>(mut keys: I, value: String) -> TrieNode
-    where
-        I: Iterator<Item = char>,
-    {
-        let Some(first) = keys.next() else{
-            panic!("Tail of TrieNodes cannot be created from an empty sequence");
-        };
-        let mut top_node = TrieNode::new(Some(first), None);
-        let mut last_node = &mut top_node;
-        for key in keys {
-            last_node = { last_node }
-                .children
-                .entry(key)
-                .or_insert(TrieNode::new(Some(key), None));
-        }
-        last_node.value = Some(value);
-        top_node
-    }
+    let mut map: HashMap<char, i32> = HashMap::new();
+    // map.insert('a', 1);
+    // map.insert('b', 1);
+    // map.insert('c', 1);
+    // map.insert('d', 1);
 
-    pub fn insert<I>(&mut self, mut key_it: I, value: String) -> Result<(), TrieError>
-    where
-        I: Iterator<Item = char>,
-    {
-        if let Some(key) = key_it.next() {
-            let node = self
-                .children
-                .entry(key)
-                .or_insert(TrieNode::new(Some(key), None));
-            node.insert(key_it, value)
-        } else {
-            match &self.value {
-                Some(val) => {
-                    tracing::info!("Insert sequence exhausted, entry already in trie. Updating value of node\n{} -> {}",val, value);
-                    self.value = Some(value);
-                    Ok(())
-                }
-                None => {
-                    tracing::info!("Inserting new value to trie, {}", value);
-                    self.value = Some(value);
-                    Ok(())
-                }
-            }
-        }
-    }
+    let mut peekable_chars = "abcdefghi".chars().peekable();
 
-    pub fn search<I>(&self, mut key_it: I) -> Result<Option<String>, TrieError>
-    where
-        I: Iterator<Item = char>,
-    {
-        if let Some(key) = key_it.next() {
-            if let Some(node) = self.children.get(&key) {
-                node.search(key_it)
-            } else {
-                tracing::error!(
-                    "Searched for a sequence not present - does the key match? {:?} {}",
-                    self.key,
-                    key
-                );
-                Err(TrieError::Search(
-                    "Searched for sequence not present".to_string(),
-                ))
-            }
-        } else {
-            match &self.value {
-                Some(val) => {
-                    // tracing::info!("searched for sequence has value: {}", val);
-                    Ok(Some(val.to_string()))
-                }
-                None => {
-                    tracing::info!("Searched for sequence has no value");
-                    Ok(None)
-                }
-            }
-        }
-    }
-}
-
-fn insert_iter<I>(root: &mut TrieNode, mut key_it: I, value: String) -> Result<(), TrieError>
-where
-    I: Iterator<Item = char>,
-{
-    let mut node = root;
-
-    let mut key = key_it.next();
-    let Some(mut k) = key else{
-        return Err(TrieError::Insert("Empty character sequence".to_string()))
-    };
-    while node.children.contains_key(&k) {
-        node = { node }
-            .children
-            .get_mut(&k)
-            .expect("child corresponding to contained key not found.");
-        key = key_it.next();
-        match key {
-            Some(new_k) => k = new_k,
-            None => break, // Here we know we've reached end - just insert...
-        }
-    }
-    // Either we're in the node that the value is destined for (None), or we need to make a path to a new node
-    match key {
-        None => {
-            tracing::info!(
-                "Think we're in the correct node with key {:?}. Updating value {:?} -> {}",
-                node.key,
-                node.value,
-                value
-            );
-            node.value = Some(value)
-        }
-        Some(k) => {
-            tracing::info!(
-                "Required path not in trie, making tail starting at node with key {:?}",
-                node.key
-            );
-            node.children.insert(
-                k,
-                TrieNode::new_tail(k.to_string().chars().chain(key_it), value),
-            );
-        }
-    }
-    Ok(())
-}
-
-fn search_iter<I>(root: &TrieNode, mut key_it: I) -> Result<Option<String>, TrieError>
-where
-    I: Iterator<Item = char>,
-{
-    // descend
-    let mut node = root;
-
-    let mut key = key_it.next();
-    let Some(mut k) = key else{
-        return Err(TrieError::Search("No search sequence".to_string()));
-    };
-    while node.children.contains_key(&k) {
-        node = node.children.get(&k).unwrap();
-        key = key_it.next();
-        match key {
-            Some(new_k) => k = new_k,
-            None => break,
-        }
-    }
-    match key {
-        Some(more_k) => {
-            tracing::info!(
-                "No such sequence in trie, {} not a child of current node",
-                more_k
-            );
-            Ok(None)
-        }
-        None => {
-            tracing::info!("found the value");
-            Ok(node.value.clone())
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use tracing_test::traced_test;
-
-    use super::*;
-    #[traced_test]
-    #[test]
-    fn test_insert() {
-        let mut root = TrieNode::new(None, None);
-
-        // Insert what we were looking for
-        root.insert("a".chars(), "Hooray".to_string())
-            .expect("Error in root.insert");
-
-        tracing::debug!("{:?}", root);
-
-        assert_eq!(
-            root.children
-                .entry('a')
-                .or_insert(TrieNode::new(None, None))
-                .value,
-            Some("Hooray".to_string())
-        );
-
-        root.insert("abc".chars(), "Deeper".to_string())
-            .expect("Error during insert");
-
-        // First assert that an intermediate node with a key but no value was created
-        let intermediate = root
-            .children
-            .entry('a')
-            .or_insert(TrieNode::new(None, None))
-            .children
-            .entry('b')
-            .or_insert(TrieNode::new(
-                Some('X'),
-                Some("Should't have this".to_string()),
-            ));
-
-        assert_eq!(intermediate.key, Some('b'));
-        assert_eq!(intermediate.value, None);
-
-        // Now assert that the leaf node has the correct key and value
-        let leaf = intermediate.children.entry('c').or_insert(TrieNode::new(
-            Some('X'),
-            Some("Should't have this".to_string()),
-        ));
-
-        assert_eq!(leaf.key, Some('c'));
-        assert_eq!(leaf.value, Some("Deeper".to_string()));
-    }
-
-    #[traced_test]
-    #[test]
-    fn test_search() {
-        let mut root = TrieNode::new(None, None);
-        let target_str = "MockValue";
-        root.children
-            .insert('a', TrieNode::new(Some('a'), Some(target_str.to_string())));
-
-        tracing::debug!("{:?}", root);
-
-        let searched_val = root
-            .search("a".chars())
-            .expect("Error during search")
-            .unwrap();
-        assert_eq!(searched_val, target_str.to_string());
-
-        let target_str = "Deeper";
-        let mut intermediate = TrieNode::new(Some('b'), None);
-        intermediate
-            .children
-            .insert('c', TrieNode::new(Some('c'), Some(target_str.to_string())));
-
-        root.children
-            .entry('a')
-            .or_insert(TrieNode::new(None, None))
-            .children
-            .insert('b', intermediate);
-
-        let searched_val = root.search("ab".chars()).expect("Error during search");
-        assert_eq!(searched_val, None);
-
-        let searched_val = root
-            .search("abc".chars())
-            .expect("Error during search")
-            .unwrap();
-        assert_eq!(searched_val, target_str.to_string());
-    }
-
-    #[traced_test]
-    #[test]
-    fn test_insert_iter() {
-        let mut root = TrieNode::new(None, None);
-
-        // Insert what we were looking for
-        insert_iter(&mut root, "a".chars(), "Hooray".to_string())
-            .expect("Error during insert_iter");
-
-        tracing::debug!("{:?}", root);
-
-        assert_eq!(
-            root.children
-                .entry('a')
-                .or_insert(TrieNode::new(None, None))
-                .value,
-            Some("Hooray".to_string())
-        );
-
-        insert_iter(&mut root, "abc".chars(), "Deeper".to_string())
-            .expect("Error during insert iter");
-
-        // First assert that an intermediate node with a key but no value was created
-        let intermediate = root
-            .children
-            .entry('a')
-            .or_insert(TrieNode::new(None, None))
-            .children
-            .entry('b')
-            .or_insert(TrieNode::new(
-                Some('X'),
-                Some("Should't have this".to_string()),
-            ));
-
-        assert_eq!(intermediate.key, Some('b'));
-        assert_eq!(intermediate.value, None);
-
-        // Now assert that the leaf node has the correct key and value
-        let leaf = intermediate.children.entry('c').or_insert(TrieNode::new(
-            Some('X'),
-            Some("Should't have this".to_string()),
-        ));
-
-        assert_eq!(leaf.key, Some('c'));
-        assert_eq!(leaf.value, Some("Deeper".to_string()));
-    }
-
-    #[traced_test]
-    #[test]
-    fn test_search_iter() {
-        let mut root = TrieNode::new(None, None);
-        let target_str = "MockValue";
-        root.children
-            .insert('a', TrieNode::new(Some('a'), Some(target_str.to_string())));
-
-        tracing::debug!("{:?}", root);
-
-        let searched_val = search_iter(&root, "a".chars())
-            .expect("Error during search")
-            .unwrap();
-        assert_eq!(searched_val, target_str.to_string());
-
-        let target_str = "Deeper";
-        let mut intermediate = TrieNode::new(Some('b'), None);
-        intermediate
-            .children
-            .insert('c', TrieNode::new(Some('c'), Some(target_str.to_string())));
-
-        root.children
-            .entry('a')
-            .or_insert(TrieNode::new(None, None))
-            .children
-            .insert('b', intermediate);
-
-        let searched_val = search_iter(&root, "ab".chars()).expect("Error during search");
-        assert_eq!(searched_val, None);
-
-        let searched_val = search_iter(&root, "abc".chars())
-            .expect("Error during search")
-            .unwrap();
-        assert_eq!(searched_val, target_str.to_string());
-    }
-
-    #[traced_test]
-    #[test]
-    #[should_panic]
-    fn test_new_tail_empty() {
-        TrieNode::new_tail("".chars(), "TheEnd".to_string());
-    }
-
-    #[traced_test]
-    #[test]
-    fn test_new_tail_single() {
-        let target_str = "TheStartAndEnd";
-        let node = TrieNode::new_tail("a".chars(), target_str.to_string());
-        assert_eq!(node.key, Some('a'));
-        assert_eq!(node.value, Some(target_str.to_string()));
-
-        assert!(node.children.is_empty());
-    }
-
-    #[traced_test]
-    #[test]
-    fn test_new_tail_multiple() {
-        let target_str = "TheEnd";
-        let node = TrieNode::new_tail("abc".chars(), target_str.to_string());
-        assert_eq!(node.key, Some('a'));
-        assert_eq!(node.value, None);
-
-        let Some(node) = node.children.get(&'b') else{
-            panic!("Expected intermediate node at 'b'");
-        };
-        assert_eq!(node.key, Some('b'));
-        assert_eq!(node.value, None);
-
-        let Some(node) = node.children.get(&'c') else{
-            panic!("Expected leaf node at 'c'");
-        };
-        assert_eq!(node.key, Some('c'));
-        assert_eq!(node.value, Some(target_str.to_string()));
-        assert!(node.children.is_empty());
-    }
+    take_if_in_map(map, &mut peekable_chars);
+    println!("{:?}", peekable_chars.next());
 }
