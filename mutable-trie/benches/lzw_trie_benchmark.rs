@@ -3,9 +3,9 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use mutable_trie::{IterLzwDict, LzwDict, Trie, TrieNode};
 
 fn lzw_trie(to_insert: String) {
-    let alphabet = "abcdefghijklmnopqrstuvwxyz".chars();
-    let codes = 0..26;
-    let alpha_codes = alphabet.zip(codes);
+    let alpha_codes = "abcdefghijklmnopqrstuvwxyz"
+        .char_indices()
+        .map(|(u, c)| (c, u as i32));
 
     let mut root: TrieNode<char, i32> = TrieNode::new(None, None);
     root.populate_initial(alpha_codes).unwrap();
@@ -18,9 +18,9 @@ fn lzw_trie(to_insert: String) {
 }
 
 fn iter_lzw_trie(to_insert: String) {
-    let alphabet = "abcdefghijklmnopqrstuvwxyz".chars();
-    let codes = 0..26;
-    let alpha_codes = alphabet.zip(codes);
+    let alpha_codes = "abcdefghijklmnopqrstuvwxyz"
+        .char_indices()
+        .map(|(u, c)| (c, u as i32));
 
     let mut root: TrieNode<char, i32> = TrieNode::new(None, None);
     root.populate_initial(alpha_codes).unwrap();
