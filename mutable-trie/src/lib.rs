@@ -38,10 +38,10 @@ pub trait IterTrie<T, K, V> {
 }
 
 pub trait LzwDict<K, V> {
-    fn lzw_insert<I: Iterator<Item = K>>(
+    fn lzw_insert<I: Iterator<Item = K>, J: Iterator<Item = V>>(
         &mut self,
         key_it: &mut Peekable<I>,
-        new_val: V,
+        new_val: &mut J,
     ) -> Result<Option<V>, TrieError>;
 }
 
@@ -260,13 +260,14 @@ where
     K: TrieKey,
     V: TrieVal,
 {
-    fn lzw_insert<I>(
+    fn lzw_insert<I, J>(
         &mut self,
         key_it: &mut Peekable<I>,
-        new_val: V,
+        new_val: &mut J,
     ) -> Result<Option<V>, TrieError>
     where
         I: Iterator<Item = K>,
+        J: Iterator<Item = V>,
     {
         // Peek at the next item
         if let Some(key) = key_it.peek() {
@@ -280,15 +281,16 @@ where
                 // create a new node and add to children
                 // DO NOT advance the iterator, as next call needs to start at this key
                 // return the stored value
-                self.children
-                    .insert(*key, TrieNode::new(Some(*key), Some(new_val)));
+                self.children.insert(
+                    *key,
+                    TrieNode::new(Some(*key), Some(new_val.next().unwrap())),
+                );
                 Ok(self.value)
             }
         } else {
             //TODO: this isn't sufficient to cope with a valid end of stream... unless always a certain end token?
             info!(
-                "Escaping lzw_insert due to end of sequence, trying to add code {:?}",
-                new_val
+                "Escaping lzw_insert due to end of sequence, trying to add code from empty iterator"
             );
             Err(TrieError::Lzw(
                 "Empty search sequence before new node created".to_string(),
@@ -513,21 +515,22 @@ mod test {
         tracing::info!("Root node after alphabet: {:?}", root);
 
         let mut key_sequence = "ababc".chars().peekable();
+        let mut val_sequence = vec![99, 100, 101].into_iter();
 
         // Insert sequence "ab" and recieve the code for sequence "a"
-        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 99) else{
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, &mut val_sequence) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 0);
 
         // Insert the sequence "ba" and recieve the code for sequence "b"
-        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 100) else{
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, &mut val_sequence) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 1);
 
         // Insert the sequence "abc" and recieve the code for sequence "ab"
-        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 101) else{
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, &mut val_sequence) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 99);
@@ -617,32 +620,33 @@ mod test {
         ]
         .into_iter()
         .peekable();
+        let mut val_sequence = vec![99, 100, 101].into_iter();
 
-        // Insert sequence "ab" and recieve the code for sequence "a"
-        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 99) else{
+        // Insert sequence "ab"=99 and recieve the code for sequence "a"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, &mut val_sequence) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 0);
 
-        // Insert sequence "ba" and recieve the code for sequence "b"
-        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 100) else{
+        // Insert sequence "ba"=100 and recieve the code for sequence "b"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, &mut val_sequence) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 1);
 
-        // Insert the remaining sequence "abc" and recieve the code for sequence "ab"
-        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, 100) else{
+        // Insert the remaining sequence "abc"=101 and recieve the code for sequence "ab"
+        let Ok(Some(val)) = root.lzw_insert(&mut key_sequence, &mut val_sequence) else{
             panic!("expected to recieve a value from lzw_insert");
         };
         assert_eq!(val, 99);
 
         let final_search_sequence =
             vec![Token::Value('a'), Token::Value('b'), Token::Value('c')].into_iter();
-        // Use search method to find the value in second inserted sequence
+        // Use search method to find the value in longest inserted sequence
         let Ok(Some(val)) = root.search(final_search_sequence) else{
             panic!("expected to recieve a value from lzw_insert");
         };
-        assert_eq!(val, 100);
+        assert_eq!(val, 101);
     }
 
     #[traced_test]
@@ -658,13 +662,13 @@ mod test {
         root.populate_initial(alpha_codes);
         let mut char_iter = to_insert.chars().peekable();
         let mut codes = 26..;
-        while let Ok(Some(_v)) = root.lzw_insert(&mut char_iter, codes.next().unwrap()) {}
+        while let Ok(Some(_v)) = root.lzw_insert(&mut char_iter, &mut codes) {}
 
         let Some(next_code) = codes.next() else{
             panic!("out of codes");
         };
-        // 0-40 used, 41 passed to lzw_insert but not used, so next should be 42
-        assert_eq!(next_code, 42);
+        // 0-40 used, 41 should be the next
+        assert_eq!(next_code, 41);
 
         let trie_paths = (vec![
             "be", "beo", "eo", "eor", "no", "ob", "or", "ort", "ot", "rn", "rno", "to", "tob",

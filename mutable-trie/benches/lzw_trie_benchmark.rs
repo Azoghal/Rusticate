@@ -11,10 +11,8 @@ fn lzw_trie(to_insert: String) {
     root.populate_initial(alpha_codes).unwrap();
 
     let mut char_iter = to_insert.chars().peekable();
-    let mut code = 26;
-    while let Ok(Some(_)) = root.lzw_insert(&mut char_iter, code) {
-        code += 1;
-    }
+    let mut code = 26..;
+    while let Ok(Some(_)) = root.lzw_insert(&mut char_iter, &mut code) {}
 }
 
 fn iter_lzw_trie(to_insert: String) {
