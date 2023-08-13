@@ -87,16 +87,14 @@ fn main() {
         pack_msb_first: args.pack_msb_first,
         early_change: args.early_change,
     };
-    compress(
-        spec,
-        vec![
-            Token::Value('a'),
-            Token::Value('a'),
-            Token::Value('a'),
-            Token::End,
-        ],
-    )
-    .unwrap();
+
+    let mut input: Vec<Token<char>> = "tobeornottobeortobeornot"
+        .chars()
+        .map(Token::Value)
+        .collect();
+    input.push(Token::End);
+
+    compress(spec, input).unwrap();
 }
 
 #[derive(Debug)]
@@ -150,18 +148,15 @@ fn compress<T: TrieKey + Alphabetable<T>>(
 
     let mut peek_file = file_vec.into_iter().peekable();
 
-    // TODO: replace this with a separate functon which includes logic r.e. end token etc.
-    let code_to_emit = lzw_trie
-        .lzw_insert(&mut peek_file, code_gen.next().unwrap())
-        .map_err(LzwError::from_trie)?; // TODO: need lazy code consumption
+    while peek_file.peek() != Some(&Token::End) {
+        // TODO: replace this with a separate functon which includes logic r.e. end token etc.
 
-    tracing::info!("Code emitted: {:?}", code_to_emit);
+        let code_to_emit = lzw_trie
+            .lzw_insert(&mut peek_file, &mut code_gen)
+            .map_err(LzwError::from_trie)?; // TODO: need lazy code consumption
 
-    let code_to_emit = lzw_trie
-        .lzw_insert(&mut peek_file, code_gen.next().unwrap())
-        .map_err(LzwError::from_trie)?; // TODO: need lazy code consumption
-
-    tracing::info!("Code emitted: {:?}", code_to_emit);
+        tracing::info!("Code emitted: {:?}", code_to_emit);
+    }
 
     Ok(())
 }
