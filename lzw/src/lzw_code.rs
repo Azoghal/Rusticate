@@ -36,7 +36,7 @@ impl fmt::Display for Code {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive()]
 pub struct CodeGenerator {
     current_code: u32,
     variable_width: bool,
@@ -60,6 +60,25 @@ impl CodeGenerator {
     }
 
     pub fn get_next_code(&mut self) -> Option<Code> {
+        // Check that current bit width is respected
+        if self.current_code >> self.width != 0 {
+            tracing::debug!(
+                "All codes for current code width {} already used",
+                self.width,
+            );
+            None
+        } else {
+            // current fits within bit width
+            let res = Some(Code::new(self.current_code, self.width));
+            self.current_code += 1;
+            res
+        }
+    }
+}
+
+impl Iterator for CodeGenerator {
+    type Item = Code;
+    fn next(&mut self) -> Option<Self::Item> {
         // Check that current bit width is respected
         if self.current_code >> self.width != 0 {
             tracing::debug!(

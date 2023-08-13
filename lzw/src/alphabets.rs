@@ -1,4 +1,3 @@
-use crate::ArgAlphabet;
 use mutable_trie::{Token, TrieKey};
 
 pub enum AlphabetError {

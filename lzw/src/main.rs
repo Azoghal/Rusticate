@@ -1,7 +1,7 @@
 use alphabets::Alphabetable;
 use base64::engine::general_purpose;
 use clap::{Args, Parser, ValueEnum};
-use lzw_code::Code;
+use lzw_code::{Code, CodeGenerator};
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -87,14 +87,48 @@ fn main() {
         pack_msb_first: args.pack_msb_first,
         early_change: args.early_change,
     };
-    compress(spec, vec![Token::Value('a'), Token::End]);
-    b64_encode_to_file(&args.filename).unwrap();
-    b64_decode_from_file(&args.filename).unwrap();
+    compress(
+        spec,
+        vec![
+            Token::Value('a'),
+            Token::Value('a'),
+            Token::Value('a'),
+            Token::End,
+        ],
+    )
+    .unwrap();
 }
 
-// TODO - implement from AlphabetError
+#[derive(Debug)]
 enum LzwError {
     Compress(String),
+    Alphabet(String),
+    Trie(String),
+}
+
+// TODO: smoother way to do it with From::from etc?
+impl LzwError {
+    fn from_alphabet(err: alphabets::AlphabetError) -> LzwError {
+        match err {
+            alphabets::AlphabetError::Generate(s) => {
+                LzwError::Alphabet(String::from("Generation error") + &s)
+            }
+        }
+    }
+
+    fn from_trie(err: mutable_trie::TrieError) -> LzwError {
+        match err {
+            mutable_trie::TrieError::Insert(s) => {
+                LzwError::Trie(String::from("Trie Insert Error") + &s)
+            }
+            mutable_trie::TrieError::Search(s) => {
+                LzwError::Trie(String::from("Trie Search Error") + &s)
+            }
+            mutable_trie::TrieError::Lzw(s) => {
+                LzwError::Trie(String::from("LzwTrie LzwInsert Error") + &s)
+            }
+        }
+    }
 }
 
 // https://planetcalc.com/9069/
@@ -106,13 +140,49 @@ fn compress<T: TrieKey + Alphabetable<T>>(
     file_vec: Vec<Token<T>>,
 ) -> Result<(), LzwError> {
     let mut code_gen = lzw_code::CodeGenerator::new(spec);
-    let alphabet = T::generate(); //TODO generate from the type parameter
-    let lzw_trie: TrieNode<Token<T>, Code> = TrieNode::new(None, None);
+    let alphabet = T::generate().map_err(LzwError::from_alphabet)?;
+    let initial_entries = create_initial_entries(spec, alphabet, &mut code_gen);
+
+    let mut lzw_trie: TrieNode<Token<T>, Code> = TrieNode::new(None, None);
+    lzw_trie
+        .populate_initial(initial_entries)
+        .map_err(LzwError::from_trie)?;
+
+    let mut peek_file = file_vec.into_iter().peekable();
+
+    // TODO: replace this with a separate functon which includes logic r.e. end token etc.
+    let code_to_emit = lzw_trie
+        .lzw_insert(&mut peek_file, code_gen.next().unwrap())
+        .map_err(LzwError::from_trie)?; // TODO: need lazy code consumption
+
+    tracing::info!("Code emitted: {:?}", code_to_emit);
+
+    let code_to_emit = lzw_trie
+        .lzw_insert(&mut peek_file, code_gen.next().unwrap())
+        .map_err(LzwError::from_trie)?; // TODO: need lazy code consumption
+
+    tracing::info!("Code emitted: {:?}", code_to_emit);
+
     Ok(())
 }
 
 fn decompress<T>(spec: LzwSpec, code_vec: Vec<Code>) {
     // Generate initial dictionary based on T
+}
+
+fn create_initial_entries<'a, T: TrieKey + 'a>(
+    spec: LzwSpec,
+    mut tokens: Vec<Token<T>>,
+    code_gen: &'a mut CodeGenerator,
+) -> impl Iterator<Item = (Token<T>, Code)> + 'a {
+    // TODO: add clear and end codes if in spec
+    if spec.clear_code {
+        tokens.push(Token::Clear);
+    }
+    if spec.end_code {
+        tokens.push(Token::End);
+    }
+    tokens.into_iter().zip(code_gen)
 }
 
 fn b64_decode_from_file(filename: &str) -> std::io::Result<()> {
