@@ -1,39 +1,33 @@
-use crate::lzw_token::{ControlToken, HashableToken, Token};
 use crate::ArgAlphabet;
+use mutable_trie::{Token, TrieKey};
 
-#[derive(Debug, Copy, Clone)]
-pub enum Alphabet {
-    _Test,
-    Ascii,
-    // TODO add more
+pub enum AlphabetError {
+    Generate(String),
 }
 
-impl Alphabet {
-    pub fn new(alpha: ArgAlphabet) -> Alphabet {
-        match alpha {
-            ArgAlphabet::_Test => Alphabet::_Test,
-            ArgAlphabet::Ascii => Alphabet::Ascii,
-        }
+pub trait Alphabetable<T: TrieKey> {
+    fn generate() -> Result<Vec<Token<T>>, AlphabetError> {
+        Err(AlphabetError::Generate(String::from(
+            "Generate not implemented for type",
+        )))
     }
 }
 
-// TODO: fix this if it is needed?
-// pub fn produce_alphabet(alpha: Alphabet) -> Box<dynVec<Token<T>> {
-//     match alpha {
-//         Alphabet::_Test => generate_test_alphabet(),
-//         Alphabet::Ascii => generate_ascii(),
-//     }
-// }
-
-pub fn generate_ascii() -> Vec<Token<char>> {
-    let printable_chars: String = String::from(" !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
-    let alphabet = printable_chars.chars();
-    let res: Vec<Token<char>> = alphabet.map(Token::new).collect();
-    println!("Length of initial alphabet {}", res.len());
-    res
+impl Alphabetable<char> for char {
+    fn generate() -> Result<Vec<Token<char>>, AlphabetError> {
+        let printable_chars: String = String::from(" !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+        let alphabet = printable_chars.chars();
+        let res: Vec<Token<char>> = alphabet.map(Token::Value).collect();
+        Ok(res)
+    }
 }
 
-// fn generate_test_alphabet<T>() -> Vec<T> {
-//     let alphabet: Vec<T> = Vec::new();
-//     alphabet
-// }
+impl Alphabetable<i32> for i32 {
+    fn generate() -> Result<Vec<Token<i32>>, AlphabetError> {
+        let res: Vec<Token<i32>> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+            .into_iter()
+            .map(Token::Value)
+            .collect();
+        Ok(res)
+    }
+}

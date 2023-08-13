@@ -1,5 +1,7 @@
+use alphabets::Alphabetable;
 use base64::engine::general_purpose;
 use clap::{Args, Parser, ValueEnum};
+use lzw_code::Code;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -7,13 +9,12 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 mod alphabets;
 mod lzw_code;
-mod lzw_token;
-mod trie_dictionary;
-use trie_dictionary::TrieDictionary;
+use mutable_trie::{self, TrieKey};
+use mutable_trie::{LzwDict, Token, Trie, TrieNode};
 
 #[derive(Debug, Copy, Clone)]
 pub struct LzwSpec {
-    alphabet: alphabets::Alphabet,
+    alphabet: ArgAlphabet,
     variable_width: bool,
     width: u8,
     min_width: u8,
@@ -76,7 +77,7 @@ fn main() {
 
     let args = LzwArgs::parse();
     let spec = LzwSpec {
-        alphabet: alphabets::Alphabet::new(args.alphabet),
+        alphabet: args.alphabet,
         variable_width: args.variable_width,
         width: args.width,
         min_width: args.min_width,
@@ -86,23 +87,33 @@ fn main() {
         pack_msb_first: args.pack_msb_first,
         early_change: args.early_change,
     };
-    compress(spec);
+    compress(spec, vec![Token::Value('a'), Token::End]);
     b64_encode_to_file(&args.filename).unwrap();
     b64_decode_from_file(&args.filename).unwrap();
 }
 
-// https://planetcalc.com/9069/
-
-fn compress(spec: LzwSpec) {
-    let mut code_gen = lzw_code::CodeGenerator::new(spec);
-    let alphabet = alphabets::generate_ascii(); //TODO generate from the spec
-    let dict = TrieDictionary::new(spec, &mut code_gen, alphabet);
-
-    let test_source: Vec<char> = "tobeornottobetobeornottobe".chars().collect();
-    // Repeatedly read, evaluate from input, Emit to output
+// TODO - implement from AlphabetError
+enum LzwError {
+    Compress(String),
 }
 
-fn decompress() {}
+// https://planetcalc.com/9069/
+
+// TODO: type alias TrieNode for lzwdict
+
+fn compress<T: TrieKey + Alphabetable<T>>(
+    spec: LzwSpec,
+    file_vec: Vec<Token<T>>,
+) -> Result<(), LzwError> {
+    let mut code_gen = lzw_code::CodeGenerator::new(spec);
+    let alphabet = T::generate(); //TODO generate from the type parameter
+    let lzw_trie: TrieNode<Token<T>, Code> = TrieNode::new(None, None);
+    Ok(())
+}
+
+fn decompress<T>(spec: LzwSpec, code_vec: Vec<Code>) {
+    // Generate initial dictionary based on T
+}
 
 fn b64_decode_from_file(filename: &str) -> std::io::Result<()> {
     // File is in b64 encoding

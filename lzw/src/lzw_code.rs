@@ -1,3 +1,5 @@
+use mutable_trie::TrieVal;
+
 use crate::LzwSpec;
 use std::fmt;
 
