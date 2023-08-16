@@ -9,8 +9,10 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 mod alphabets;
 mod lzw_code;
+mod lzw_dict;
+use lzw_dict::{LzwDict, Token};
 use mutable_trie::{self, TrieKey};
-use mutable_trie::{LzwDict, Token, Trie, TrieNode};
+use mutable_trie::{Trie, TrieNode};
 
 #[derive(Debug, Copy, Clone)]
 pub struct LzwSpec {
@@ -148,14 +150,16 @@ fn compress<T: TrieKey + Alphabetable<T>>(
 
     let mut peek_file = file_vec.into_iter().peekable();
 
-    while peek_file.peek() != Some(&Token::End) {
-        // TODO: replace this with a separate functon which includes logic r.e. end token etc.
-
-        let code_to_emit = lzw_trie
-            .lzw_insert(&mut peek_file, &mut code_gen)
-            .map_err(LzwError::from_trie)?; // TODO: need lazy code consumption
-
-        tracing::info!("Code emitted: {:?}", code_to_emit);
+    // While not the end token, emit codes
+    // Also need to cope with clear token - so probably a match
+    // TODO Is there a nice way to use the peekable trait to do this loop
+    // Maybe we don't actually need to match on contents- only none and some
+    // Seems sub optimal to have to peek at all the tokens.
+    while let Some(code_to_emit) = lzw_trie
+        .lzw_insert(&mut peek_file, &mut code_gen)
+        .map_err(LzwError::from_trie)?
+    {
+        tracing::info!("End Code emitted: {:?}", code_to_emit);
     }
 
     Ok(())

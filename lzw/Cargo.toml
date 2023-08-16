@@ -14,5 +14,13 @@ strum = "0.25.0"
 strum_macros = "0.25.1"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.17"
+tracing-test = "0.2.4"
+
 mutable_trie = { path = "../mutable-trie" }
 
+[dev-dependencies]
+criterion="0.3"
+
+[[bench]]
+name = "lzw_trie_benchmark"
+harness = false

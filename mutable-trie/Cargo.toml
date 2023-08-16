@@ -25,9 +25,5 @@ name = "mutable_trie_"
 path = "src/main.rs"
 
 [[bench]]
-name = "lzw_trie_benchmark"
-harness = false
-
-[[bench]]
 name = "trie_benchmark"
 harness = false

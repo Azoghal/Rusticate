@@ -1,4 +1,5 @@
-use mutable_trie::{Token, TrieKey};
+use crate::lzw_dict::Token;
+use mutable_trie::TrieKey;
 
 pub enum AlphabetError {
     Generate(String),

@@ -1,8 +1,3 @@
-use std::{
-    collections::HashMap,
-    iter::{self, Peekable},
-};
-
 use clap::Parser;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
