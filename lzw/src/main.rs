@@ -9,7 +9,7 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 mod alphabets;
 mod lzw_code;
-mod lzw_dict;
+pub mod lzw_dict;
 use lzw_dict::{LzwDict, Token};
 use mutable_trie::{self, TrieKey};
 use mutable_trie::{Trie, TrieNode};

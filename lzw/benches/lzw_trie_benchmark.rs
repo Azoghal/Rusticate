@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use mutable_trie::{IterLzwDict, LzwDict, Trie, TrieNode};
+use lzw::lzw_dict::{IterLzwDict, LzwDict};
+use mutable_trie::{Trie, TrieNode};
 
 fn lzw_trie(to_insert: String) {
     let alpha_codes = "abcdefghijklmnopqrstuvwxyz"
